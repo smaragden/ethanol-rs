@@ -10,7 +10,9 @@ const METABOLISM_RATE: f64 = 0.015;
 const TRAJECTORY_WINDOW_SECS: f64 = 300.0;
 
 /// A single drink for BAC calculation.
-#[derive(Debug, Clone, uniffi::Record)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
 pub struct Drink {
     /// Volume in milliliters.
     pub volume_ml: f64,
@@ -24,7 +26,9 @@ pub struct Drink {
 }
 
 /// User's physical profile for BAC calculation.
-#[derive(Debug, Clone, uniffi::Record)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
 pub struct UserProfile {
     /// Weight in kilograms.
     pub weight_kg: f64,
@@ -36,7 +40,9 @@ pub struct UserProfile {
 }
 
 /// Complete BAC snapshot at a point in time.
-#[derive(Debug, Clone, uniffi::Record)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
 pub struct BACSnapshot {
     pub bac: f64,
     pub trajectory: Trajectory,
@@ -147,7 +153,7 @@ pub fn trajectory(
 }
 
 /// Estimated seconds until BAC reaches zero.
-#[uniffi::export]
+#[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn estimate_time_to_sober(current_bac: f64) -> Option<f64> {
     if current_bac <= 0.001 {
         return None;
@@ -217,16 +223,19 @@ pub fn absorbing_drink_count(drinks: &[Drink]) -> usize {
 
 // MARK: - UniFFI exports
 
+#[cfg(feature = "mobile")]
 #[uniffi::export]
 pub fn calc_bac(drinks: Vec<Drink>, profile: UserProfile, formula: BACFormula) -> f64 {
     calculate_bac(&drinks, &profile, formula)
 }
 
+#[cfg(feature = "mobile")]
 #[uniffi::export]
 pub fn calc_trajectory(drinks: Vec<Drink>, profile: UserProfile, formula: BACFormula) -> Trajectory {
     trajectory(&drinks, &profile, formula)
 }
 
+#[cfg(feature = "mobile")]
 #[uniffi::export]
 pub fn calc_snapshot(
     drinks: Vec<Drink>,
@@ -238,6 +247,7 @@ pub fn calc_snapshot(
     snapshot(&drinks, &profile, formula, sweet_spot_min, sweet_spot_max)
 }
 
+#[cfg(feature = "mobile")]
 #[uniffi::export]
 pub fn calc_absorbing_drink_count(drinks: Vec<Drink>) -> u32 {
     absorbing_drink_count(&drinks) as u32

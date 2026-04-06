@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>buzz-core WASM Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .result h3 {
+            margin-top: 0;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0051d5;
+        }
+    </style>
+</head>
+<body>
+    <h1>🍺 buzz-core WASM Example</h1>
+
+    <p>This example demonstrates the buzz-core BAC calculator running in WebAssembly.</p>
+
+    <button id="calculate">Calculate BAC Example</button>
+
+    <div class="result" id="result" style="display: none;">
+        <h3>Results</h3>
+        <pre id="output"></pre>
+    </div>
+
+    <h2>Scenario</h2>
+    <p>
+        A 30-year-old male weighing 80kg (180cm tall) consumed:<br>
+        - Beer (330ml, 5% ABV) 30 minutes ago on an empty stomach<br>
+        - Beer (330ml, 5% ABV) 1 hour ago on an empty stomach
+    </p>
+
+    <script type="module">
+        import init, {
+            calculateBAC,
+            calculateSnapshot,
+            createDrink,
+            createUserProfile
+        } from './pkg/buzz_core.js';
+
+        async function run() {
+            // Initialize the WASM module
+            await init();
+
+            const calculateButton = document.getElementById('calculate');
+            const resultDiv = document.getElementById('result');
+            const outputPre = document.getElementById('output');
+
+            calculateButton.addEventListener('click', () => {
+                try {
+                    // Create user profile
+                    const profile = createUserProfile(
+                        80.0,        // weight in kg
+                        "male",      // biological sex
+                        180.0,       // height in cm
+                        30           // age
+                    );
+
+                    // Create drinks
+                    const drink1 = createDrink(
+                        330.0,       // volume in ml
+                        0.05,        // ABV (5%)
+                        -3600.0,     // 1 hour ago
+                        "empty"      // stomach state
+                    );
+
+                    const drink2 = createDrink(
+                        330.0,       // volume in ml
+                        0.05,        // ABV (5%)
+                        -1800.0,     // 30 minutes ago
+                        "empty"      // stomach state
+                    );
+
+                    const drinks = [drink1, drink2];
+
+                    // Calculate BAC
+                    const bac = calculateBAC(drinks, profile, "widmark");
+
+                    // Get complete snapshot
+                    const snapshot = calculateSnapshot(
+                        drinks,
+                        profile,
+                        "widmark",
+                        0.06,  // sweet spot min
+                        0.09   // sweet spot max
+                    );
+
+                    // Display results
+                    const results = {
+                        "Current BAC": `${bac.toFixed(3)}%`,
+                        "Trajectory": snapshot.trajectory,
+                        "Zone": snapshot.zone,
+                        "Time to Sober": snapshot.time_to_sober_secs
+                            ? `${Math.round(snapshot.time_to_sober_secs / 60)} minutes`
+                            : "Already sober",
+                        "Full Snapshot": snapshot
+                    };
+
+                    outputPre.textContent = JSON.stringify(results, null, 2);
+                    resultDiv.style.display = 'block';
+
+                } catch (error) {
+                    outputPre.textContent = `Error: ${error.message}`;
+                    resultDiv.style.display = 'block';
+                }
+            });
+        }
+
+        run();
+    </script>
+
+    <h2>Instructions</h2>
+    <ol>
+        <li>Make sure you've built the WASM package: <code>./build-wasm.sh web</code></li>
+        <li>Serve this file with a local web server (required for WASM):
+            <ul>
+                <li><code>python3 -m http.server 8000</code>, or</li>
+                <li><code>npx serve .</code>, or</li>
+                <li>Any other local server</li>
+            </ul>
+        </li>
+        <li>Open <code>http://localhost:8000/example.html</code> in your browser</li>
+        <li>Click the "Calculate BAC Example" button</li>
+    </ol>
+</body>
+</html>

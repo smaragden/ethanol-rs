@@ -8,7 +8,7 @@ use crate::types::BACZone;
 /// - Sweet spot: BAC <= sweet_spot_max
 /// - Caution: BAC <= sweet_spot_max + 0.01
 /// - Danger: everything above
-#[uniffi::export]
+#[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn classify_zone(bac: f64, sweet_spot_min: f64, sweet_spot_max: f64) -> BACZone {
     if bac <= 0.001 {
         BACZone::Sober

@@ -1,6 +1,11 @@
 # Rust
 /target/
 
+# WASM build outputs
+/pkg/
+/pkg-node/
+/pkg-bundler/
+
 # Devenv
 .devenv*
 devenv.local.nix
