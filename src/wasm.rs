@@ -189,3 +189,75 @@ pub fn create_user_profile(
     serde_wasm_bindgen::to_value(&profile)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
+
+/// Generate a BAC curve over a time range.
+///
+/// # Parameters
+/// - `drinks`: JSON array of drink objects
+/// - `profile`: JSON object with user profile
+/// - `formula`: "widmark" or "watson"
+/// - `fromOffsetSecs`: Start of the curve (seconds offset from t=0)
+/// - `toOffsetSecs`: End of the curve (seconds offset from t=0)
+/// - `stepSecs`: Step size in seconds
+/// - `sweetSpotMin`: Minimum BAC for sweet spot
+/// - `sweetSpotMax`: Maximum BAC for sweet spot
+///
+/// # Returns
+/// Array of CurvePoint objects with offset_secs, bac, and zone
+#[wasm_bindgen(js_name = generateCurve)]
+pub fn generate_curve(
+    drinks: JsValue,
+    profile: JsValue,
+    formula: JsValue,
+    from_offset_secs: f64,
+    to_offset_secs: f64,
+    step_secs: f64,
+    sweet_spot_min: f64,
+    sweet_spot_max: f64,
+) -> Result<JsValue, JsValue> {
+    let drinks: Vec<Drink> = serde_wasm_bindgen::from_value(drinks)
+        .map_err(|e| JsValue::from_str(&format!("Invalid drinks: {}", e)))?;
+    let profile: UserProfile = serde_wasm_bindgen::from_value(profile)
+        .map_err(|e| JsValue::from_str(&format!("Invalid profile: {}", e)))?;
+    let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
+        .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
+
+    let points = crate::bac::generate_curve(
+        &drinks,
+        &profile,
+        formula,
+        from_offset_secs,
+        to_offset_secs,
+        step_secs,
+        sweet_spot_min,
+        sweet_spot_max,
+    );
+
+    serde_wasm_bindgen::to_value(&points)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+/// Estimate minutes until BAC reaches zero, accounting for ongoing absorption.
+///
+/// # Parameters
+/// - `drinks`: JSON array of drink objects
+/// - `profile`: JSON object with user profile
+/// - `formula`: "widmark" or "watson"
+///
+/// # Returns
+/// Minutes until sober (0.0 if already sober)
+#[wasm_bindgen(js_name = minutesUntilSober)]
+pub fn minutes_until_sober(
+    drinks: JsValue,
+    profile: JsValue,
+    formula: JsValue,
+) -> Result<f64, JsValue> {
+    let drinks: Vec<Drink> = serde_wasm_bindgen::from_value(drinks)
+        .map_err(|e| JsValue::from_str(&format!("Invalid drinks: {}", e)))?;
+    let profile: UserProfile = serde_wasm_bindgen::from_value(profile)
+        .map_err(|e| JsValue::from_str(&format!("Invalid profile: {}", e)))?;
+    let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
+        .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
+
+    Ok(crate::bac::minutes_until_sober(&drinks, &profile, formula))
+}
