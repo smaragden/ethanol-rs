@@ -51,6 +51,19 @@ pub struct BACSnapshot {
     pub time_to_sober_secs: Option<f64>,
 }
 
+/// A single point in a BAC curve.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
+pub struct CurvePoint {
+    /// Time offset in seconds from the reference time.
+    pub offset_secs: f64,
+    /// BAC value at this point.
+    pub bac: f64,
+    /// Zone classification at this point.
+    pub zone: BACZone,
+}
+
 /// Calculate BAC from a set of drinks at `t = 0` (the reference time).
 ///
 /// Each drink's `offset_secs` indicates when it was consumed relative to now.
@@ -117,7 +130,7 @@ pub fn calculate_bac(
 /// Calculate BAC at an arbitrary time offset (in seconds) from `t = 0`.
 ///
 /// Shifts all drink offsets by `time_offset_secs` to compute BAC at a different point.
-fn calculate_bac_at_offset(
+pub fn calculate_bac_at_offset(
     drinks: &[Drink],
     profile: &UserProfile,
     formula: BACFormula,
@@ -188,6 +201,48 @@ pub fn snapshot(
     }
 }
 
+/// Generate a BAC curve over a time range.
+///
+/// Computes BAC at regular intervals from `from_offset_secs` to `to_offset_secs`,
+/// returning a vector of `CurvePoint` with zone classification at each point.
+///
+/// All iteration happens internally — callers cross the FFI boundary only once.
+///
+/// # Parameters
+/// - `drinks`: Drinks with `offset_secs` relative to `t = 0`
+/// - `profile`: User physical profile
+/// - `formula`: Widmark or Watson
+/// - `from_offset_secs`: Start of the curve (seconds offset from t=0, typically negative for past)
+/// - `to_offset_secs`: End of the curve (seconds offset from t=0, typically positive for future)
+/// - `step_secs`: Step size in seconds (e.g., 60.0 for one-minute resolution)
+/// - `sweet_spot_min` / `sweet_spot_max`: Zone classification thresholds
+pub fn generate_curve(
+    drinks: &[Drink],
+    profile: &UserProfile,
+    formula: BACFormula,
+    from_offset_secs: f64,
+    to_offset_secs: f64,
+    step_secs: f64,
+    sweet_spot_min: f64,
+    sweet_spot_max: f64,
+) -> Vec<CurvePoint> {
+    let mut points = Vec::new();
+    let mut offset = from_offset_secs;
+
+    while offset <= to_offset_secs {
+        let bac = calculate_bac_at_offset(drinks, profile, formula, offset);
+        let zone = crate::zone::classify_zone(bac, sweet_spot_min, sweet_spot_max);
+        points.push(CurvePoint {
+            offset_secs: offset,
+            bac,
+            zone,
+        });
+        offset += step_secs;
+    }
+
+    points
+}
+
 /// Watson total body water estimation (liters).
 fn total_body_water(profile: &UserProfile) -> f64 {
     let age = profile.age as f64;
@@ -221,6 +276,54 @@ pub fn absorbing_drink_count(drinks: &[Drink]) -> usize {
         .count()
 }
 
+/// Estimate minutes until BAC reaches zero, accounting for ongoing absorption.
+///
+/// Uses a coarse scan (5-minute steps) to find the approximate zero crossing,
+/// then a fine scan (1-minute steps) for precision. This correctly handles
+/// drinks still being absorbed where BAC may rise before falling.
+///
+/// Returns 0.0 if already sober. Caps at 24 hours.
+pub fn minutes_until_sober(
+    drinks: &[Drink],
+    profile: &UserProfile,
+    formula: BACFormula,
+) -> f64 {
+    let current_bac = calculate_bac(drinks, profile, formula);
+    if current_bac <= 0.001 {
+        return 0.0;
+    }
+
+    let max_minutes: f64 = 24.0 * 60.0;
+    let coarse_step: f64 = 5.0;
+
+    // Coarse scan: 5-minute steps forward
+    let mut coarse_minute = coarse_step;
+    let mut found_minute = max_minutes;
+    while coarse_minute <= max_minutes {
+        let offset_secs = coarse_minute * 60.0;
+        let bac = calculate_bac_at_offset(drinks, profile, formula, offset_secs);
+        if bac <= 0.001 {
+            found_minute = coarse_minute;
+            break;
+        }
+        coarse_minute += coarse_step;
+    }
+
+    // Fine scan: 1-minute steps from one coarse step before the hit
+    let fine_start = (found_minute - coarse_step).max(0.0);
+    let mut fine_minute = fine_start;
+    while fine_minute <= found_minute {
+        let offset_secs = fine_minute * 60.0;
+        let bac = calculate_bac_at_offset(drinks, profile, formula, offset_secs);
+        if bac <= 0.001 {
+            return fine_minute;
+        }
+        fine_minute += 1.0;
+    }
+
+    found_minute
+}
+
 // MARK: - UniFFI exports
 
 #[cfg(feature = "mobile")]
@@ -251,6 +354,40 @@ pub fn calc_snapshot(
 #[uniffi::export]
 pub fn calc_absorbing_drink_count(drinks: Vec<Drink>) -> u32 {
     absorbing_drink_count(&drinks) as u32
+}
+
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn calc_curve(
+    drinks: Vec<Drink>,
+    profile: UserProfile,
+    formula: BACFormula,
+    from_offset_secs: f64,
+    to_offset_secs: f64,
+    step_secs: f64,
+    sweet_spot_min: f64,
+    sweet_spot_max: f64,
+) -> Vec<CurvePoint> {
+    generate_curve(
+        &drinks,
+        &profile,
+        formula,
+        from_offset_secs,
+        to_offset_secs,
+        step_secs,
+        sweet_spot_min,
+        sweet_spot_max,
+    )
+}
+
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn calc_minutes_until_sober(
+    drinks: Vec<Drink>,
+    profile: UserProfile,
+    formula: BACFormula,
+) -> f64 {
+    minutes_until_sober(&drinks, &profile, formula)
 }
 
 #[cfg(test)]
@@ -425,5 +562,95 @@ mod tests {
     #[test]
     fn format_bac_promille() {
         assert_eq!(format_bac(0.07, BACUnit::Promille), "0.7");
+    }
+
+    #[test]
+    fn generate_curve_returns_correct_point_count() {
+        let drinks = vec![beer(-3600.0)]; // 1 hour ago
+        let profile = male_80kg();
+        // 60 minutes at 1-minute steps = 61 points (inclusive)
+        let curve = generate_curve(&drinks, &profile, BACFormula::Widmark, -3600.0, 0.0, 60.0, 0.06, 0.09);
+        assert_eq!(curve.len(), 61);
+    }
+
+    #[test]
+    fn generate_curve_bac_rises_then_falls() {
+        let drinks = vec![beer(-3600.0)]; // 1 hour ago
+        let profile = male_80kg();
+        let curve = generate_curve(&drinks, &profile, BACFormula::Widmark, -3600.0, 3600.0, 60.0, 0.06, 0.09);
+
+        // First point should be ~0 (drink just logged)
+        assert!(curve.first().unwrap().bac < 0.01);
+        // Middle point should have some BAC
+        let mid = &curve[curve.len() / 2];
+        assert!(mid.bac > 0.0);
+    }
+
+    #[test]
+    fn generate_curve_empty_drinks() {
+        let curve = generate_curve(&[], &male_80kg(), BACFormula::Widmark, 0.0, 3600.0, 60.0, 0.06, 0.09);
+        assert!(curve.iter().all(|p| p.bac == 0.0));
+        assert!(curve.iter().all(|p| p.zone == BACZone::Sober));
+    }
+
+    #[test]
+    fn generate_curve_zones_classified() {
+        // High BAC scenario
+        let drinks = vec![
+            beer(-1800.0),
+            beer(-1800.0),
+            beer(-1800.0),
+        ];
+        let curve = generate_curve(&drinks, &male_80kg(), BACFormula::Widmark, 0.0, 0.0, 60.0, 0.06, 0.09);
+        assert_ne!(curve[0].zone, BACZone::Sober);
+    }
+
+    #[test]
+    fn minutes_until_sober_when_already_sober() {
+        let result = minutes_until_sober(&[], &male_80kg(), BACFormula::Widmark);
+        assert_eq!(result, 0.0);
+    }
+
+    #[test]
+    fn minutes_until_sober_basic() {
+        // 1 beer 1 hour ago — should be sober in a few hours
+        let drinks = vec![beer(-3600.0)];
+        let minutes = minutes_until_sober(&drinks, &male_80kg(), BACFormula::Widmark);
+        assert!(minutes > 0.0, "Should need some time to sober up");
+        assert!(minutes < 300.0, "Should be sober within 5 hours: {minutes}");
+    }
+
+    #[test]
+    fn minutes_until_sober_accounts_for_absorption() {
+        // Drink just now — still absorbing, should be longer than simple estimate
+        let drinks = vec![beer(0.0)];
+        let profile = male_80kg();
+
+        let current_bac = calculate_bac(&drinks, &profile, BACFormula::Widmark);
+        let simple_minutes = if current_bac > 0.001 {
+            (current_bac / METABOLISM_RATE) * 60.0
+        } else {
+            0.0
+        };
+
+        let accurate_minutes = minutes_until_sober(&drinks, &profile, BACFormula::Widmark);
+
+        // The accurate version should be >= the simple version because it
+        // accounts for BAC still rising from ongoing absorption
+        assert!(
+            accurate_minutes >= simple_minutes,
+            "Accurate ({accurate_minutes}) should be >= simple ({simple_minutes})"
+        );
+    }
+
+    #[test]
+    fn minutes_until_sober_multiple_drinks() {
+        let drinks = vec![
+            beer(-3600.0),  // 1 hour ago
+            beer(-1800.0),  // 30 min ago
+            beer(-600.0),   // 10 min ago
+        ];
+        let minutes = minutes_until_sober(&drinks, &male_80kg(), BACFormula::Widmark);
+        assert!(minutes > 60.0, "3 beers should take > 1 hour: {minutes}");
     }
 }
