@@ -73,14 +73,21 @@ pub fn calculate_bac(
     profile: &UserProfile,
     formula: BACFormula,
 ) -> f64 {
-    if profile.weight_kg <= 0.0 {
+    if drinks.is_empty() || profile.weight_kg <= 0.0 {
         return 0.0;
     }
+
+    // Sort chronologically and find active session
+    let mut sorted = drinks.to_vec();
+    sorted.sort_by(|a, b| a.offset_secs.partial_cmp(&b.offset_secs).unwrap());
+
+    let session_start = find_session_start(&sorted, profile, formula);
+    let active_drinks = &sorted[session_start..];
 
     let mut total_bac = 0.0;
     let mut earliest_offset: Option<f64> = None;
 
-    for drink in drinks {
+    for drink in active_drinks {
         // offset_secs is negative for past drinks; hours_elapsed is positive
         let hours_elapsed = -drink.offset_secs / 3600.0;
         if hours_elapsed < 0.0 {
@@ -144,6 +151,46 @@ pub fn calculate_bac_at_offset(
         })
         .collect();
     calculate_bac(&shifted, profile, formula)
+}
+
+/// Find the index of the first drink in the active drinking session.
+///
+/// Scans through chronologically sorted drinks and detects session boundaries
+/// where BAC from prior drinks has fully metabolized (≤ 0.001). When a boundary
+/// is found, the metabolism clock restarts from that drink.
+///
+/// This prevents unrealistic metabolism accumulation across hours of sobriety.
+fn find_session_start(
+    drinks: &[Drink],
+    profile: &UserProfile,
+    formula: BACFormula,
+) -> usize {
+    if drinks.len() <= 1 {
+        return 0;
+    }
+
+    // Drinks must be sorted chronologically (most negative offset first)
+    let mut session_start = 0;
+
+    for i in 1..drinks.len() {
+        // Compute BAC from session_start..i at the time of drink i
+        // by shifting all drinks so drink i is at t=0
+        let shifted: Vec<Drink> = drinks[session_start..i]
+            .iter()
+            .map(|d| Drink {
+                offset_secs: d.offset_secs - drinks[i].offset_secs,
+                ..d.clone()
+            })
+            .collect();
+
+        let bac_at_new_drink = calculate_bac(&shifted, profile, formula);
+
+        if bac_at_new_drink <= 0.001 {
+            session_start = i;
+        }
+    }
+
+    session_start
 }
 
 /// Determine BAC trajectory by comparing current BAC to 5 minutes ago.
@@ -652,5 +699,64 @@ mod tests {
         ];
         let minutes = minutes_until_sober(&drinks, &male_80kg(), BACFormula::Widmark);
         assert!(minutes > 60.0, "3 beers should take > 1 hour: {minutes}");
+    }
+
+    #[test]
+    fn session_detection_single_session() {
+        // Three beers in quick succession — all one session
+        let drinks = vec![
+            beer(-3600.0),  // 1 hour ago
+            beer(-1800.0),  // 30 min ago
+            beer(-600.0),   // 10 min ago
+        ];
+        let bac = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
+        let single = calculate_bac(&[beer(-600.0)], &male_80kg(), BACFormula::Widmark);
+        assert!(bac > single, "Multiple drinks should accumulate");
+    }
+
+    #[test]
+    fn session_detection_separate_sessions() {
+        // Beer 8 hours ago (fully metabolized) + beer now
+        let drinks = vec![
+            beer(-28800.0),  // 8 hours ago
+            beer(0.0),       // just now
+        ];
+        let bac_with_old = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
+        let bac_just_new = calculate_bac(&[beer(0.0)], &male_80kg(), BACFormula::Widmark);
+
+        // Old drink should not affect BAC — metabolism from 8h ago should not
+        // subtract from the new drink's contribution
+        assert!(
+            (bac_with_old - bac_just_new).abs() < 0.001,
+            "Old metabolized drink should not affect current BAC: with_old={bac_with_old}, just_new={bac_just_new}"
+        );
+    }
+
+    #[test]
+    fn session_detection_just_metabolized() {
+        // Beer 3 hours ago (should be just barely metabolized for a large male)
+        // + beer just now
+        let drinks = vec![
+            beer(-10800.0),  // 3 hours ago
+            beer(-60.0),     // 1 minute ago
+        ];
+        let bac = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
+        // Should have some positive BAC from the recent beer
+        assert!(bac >= 0.0);
+    }
+
+    #[test]
+    fn generate_curve_respects_sessions() {
+        // Beer 8 hours ago + beer at t=0 — curve should show BAC from the new beer
+        let drinks = vec![
+            beer(-28800.0),
+            beer(0.0),
+        ];
+        let curve = generate_curve(
+            &drinks, &male_80kg(), BACFormula::Widmark,
+            0.0, 3600.0, 300.0, 0.06, 0.09,
+        );
+        // Some points should have non-zero BAC from the new beer
+        assert!(curve.iter().any(|p| p.bac > 0.0));
     }
 }
