@@ -46,6 +46,9 @@ pub struct UserProfile {
 pub struct BACSnapshot {
     pub bac: f64,
     pub trajectory: Trajectory,
+    /// Trajectory angle in degrees (-90..90).
+    /// Normalised against metabolism rate: -45° ≈ steady decline, 0° = stable.
+    pub trajectory_angle_degrees: f64,
     pub zone: BACZone,
     /// Estimated seconds until sober, or `None` if already sober.
     pub time_to_sober_secs: Option<f64>,
@@ -194,22 +197,33 @@ fn find_session_start(
 }
 
 /// Determine BAC trajectory by comparing current BAC to 5 minutes ago.
+///
+/// Returns `(direction, angle_degrees)` where `angle_degrees` is the slope
+/// of the BAC curve normalised against the metabolism rate:
+/// -45° ≈ steady metabolic decline, 0° = stable, positive = rising.
 pub fn trajectory(
     drinks: &[Drink],
     profile: &UserProfile,
     formula: BACFormula,
-) -> Trajectory {
+) -> (Trajectory, f64) {
     let current = calculate_bac(drinks, profile, formula);
     let past = calculate_bac_at_offset(drinks, profile, formula, -TRAJECTORY_WINDOW_SECS);
 
     let diff = current - past;
-    if diff > 0.001 {
+    let direction = if diff > 0.001 {
         Trajectory::Rising
     } else if diff < -0.001 {
         Trajectory::Falling
     } else {
         Trajectory::Stable
-    }
+    };
+
+    // BAC change per hour, then normalise against the metabolism rate so that
+    // a steady metabolic decline corresponds to roughly -45°.
+    let rate_per_hour = diff * (3600.0 / TRAJECTORY_WINDOW_SECS);
+    let angle_degrees = (rate_per_hour / METABOLISM_RATE).atan().to_degrees();
+
+    (direction, angle_degrees)
 }
 
 /// Estimated seconds until BAC reaches zero.
@@ -236,13 +250,14 @@ pub fn snapshot(
     sweet_spot_max: f64,
 ) -> BACSnapshot {
     let bac = calculate_bac(drinks, profile, formula);
-    let traj = trajectory(drinks, profile, formula);
+    let (traj, angle) = trajectory(drinks, profile, formula);
     let zone = crate::zone::classify_zone(bac, sweet_spot_min, sweet_spot_max);
     let time_to_sober_secs = estimate_time_to_sober(bac);
 
     BACSnapshot {
         bac,
         trajectory: traj,
+        trajectory_angle_degrees: angle,
         zone,
         time_to_sober_secs,
     }
@@ -382,7 +397,13 @@ pub fn calc_bac(drinks: Vec<Drink>, profile: UserProfile, formula: BACFormula) -
 #[cfg(feature = "mobile")]
 #[uniffi::export]
 pub fn calc_trajectory(drinks: Vec<Drink>, profile: UserProfile, formula: BACFormula) -> Trajectory {
-    trajectory(&drinks, &profile, formula)
+    trajectory(&drinks, &profile, formula).0
+}
+
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn calc_trajectory_angle(drinks: Vec<Drink>, profile: UserProfile, formula: BACFormula) -> f64 {
+    trajectory(&drinks, &profile, formula).1
 }
 
 #[cfg(feature = "mobile")]
@@ -541,22 +562,33 @@ mod tests {
     fn trajectory_rising_after_recent_drink() {
         // Drink logged 2 minutes ago — still absorbing
         let drinks = [beer(-120.0)];
-        let traj = trajectory(&drinks, &male_80kg(), BACFormula::Widmark);
-        assert_eq!(traj, Trajectory::Rising);
+        let (dir, angle) = trajectory(&drinks, &male_80kg(), BACFormula::Widmark);
+        assert_eq!(dir, Trajectory::Rising);
+        assert!(angle > 0.0, "Rising angle should be positive: {angle}");
     }
 
     #[test]
     fn trajectory_falling_hours_later() {
         // Drink logged 1.5 hours ago — past peak, still metabolizing
         let drinks = [beer(-5400.0)];
-        let traj = trajectory(&drinks, &male_80kg(), BACFormula::Widmark);
-        assert_eq!(traj, Trajectory::Falling);
+        let (dir, angle) = trajectory(&drinks, &male_80kg(), BACFormula::Widmark);
+        assert_eq!(dir, Trajectory::Falling);
+        assert!(angle < 0.0, "Falling angle should be negative: {angle}");
     }
 
     #[test]
     fn trajectory_stable_no_drinks() {
-        let traj = trajectory(&[], &male_80kg(), BACFormula::Widmark);
-        assert_eq!(traj, Trajectory::Stable);
+        let (dir, angle) = trajectory(&[], &male_80kg(), BACFormula::Widmark);
+        assert_eq!(dir, Trajectory::Stable);
+        assert!(angle.abs() < 1.0, "Stable angle should be near zero: {angle}");
+    }
+
+    #[test]
+    fn trajectory_angle_within_bounds() {
+        // Angle must always be in (-90, 90)
+        let drinks = [beer(-120.0)];
+        let (_, angle) = trajectory(&drinks, &male_80kg(), BACFormula::Widmark);
+        assert!(angle > -90.0 && angle < 90.0, "Angle out of range: {angle}");
     }
 
     #[test]

@@ -27,7 +27,7 @@ pub fn calculate_bac(
     Ok(crate::bac::calculate_bac(&drinks, &profile, formula))
 }
 
-/// Calculate BAC trajectory (rising, falling, or stable).
+/// Calculate BAC trajectory (rising, falling, or stable) with angle.
 ///
 /// # Parameters
 /// - `drinks`: JSON array of drink objects
@@ -35,7 +35,8 @@ pub fn calculate_bac(
 /// - `formula`: "widmark" or "watson"
 ///
 /// # Returns
-/// Trajectory object: "rising", "falling", or "stable"
+/// Object with `direction` ("rising", "falling", or "stable") and
+/// `angle_degrees` (-90..90, where -45 ≈ steady decline, 0 = stable).
 #[wasm_bindgen(js_name = calculateTrajectory)]
 pub fn calculate_trajectory(
     drinks: JsValue,
@@ -49,8 +50,16 @@ pub fn calculate_trajectory(
     let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
         .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
 
-    let trajectory = crate::bac::trajectory(&drinks, &profile, formula);
-    serde_wasm_bindgen::to_value(&trajectory)
+    let (direction, angle_degrees) = crate::bac::trajectory(&drinks, &profile, formula);
+
+    #[derive(serde::Serialize)]
+    struct TrajectoryResult {
+        direction: crate::types::Trajectory,
+        angle_degrees: f64,
+    }
+
+    let result = TrajectoryResult { direction, angle_degrees };
+    serde_wasm_bindgen::to_value(&result)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
 
