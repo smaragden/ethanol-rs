@@ -2,13 +2,13 @@
 
 ## Problem
 
-buzz-core only provides single-point BAC calculation (`calculate_bac` computes BAC at `t = 0`). The web simulator needs to generate a full BAC curve over a time range (~180 points), which requires computing BAC at many different time offsets.
+ethanol-rs only provides single-point BAC calculation (`calculate_bac` computes BAC at `t = 0`). The web simulator needs to generate a full BAC curve over a time range (~180 points), which requires computing BAC at many different time offsets.
 
 Without a batch function, callers must either:
 1. Call `calculate_bac` in a loop from JS, paying serde serialization overhead per point (~180 JS↔WASM boundary crossings per frame), or
-2. Create a wrapper crate that reimplements the time-shifting logic (what we currently do with `buzz-wasm` in `eelair-buzz`)
+2. Create a wrapper crate that reimplements the time-shifting logic
 
-Both are wasteful. The iteration should happen inside buzz-core.
+Both are wasteful. The iteration should happen inside ethanol-rs.
 
 ## Requirements
 

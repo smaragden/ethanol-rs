@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>buzz-core WASM Example</title>
+    <title>ethanol-rs WASM Example</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -43,9 +43,9 @@
     </style>
 </head>
 <body>
-    <h1>🍺 buzz-core WASM Example</h1>
+    <h1>ethanol-rs WASM Example</h1>
 
-    <p>This example demonstrates the buzz-core BAC calculator running in WebAssembly.</p>
+    <p>This example demonstrates the ethanol-rs pharmacokinetics library running in WebAssembly.</p>
 
     <button id="calculate">Calculate BAC Example</button>
 
@@ -67,7 +67,7 @@
             calculateSnapshot,
             createDrink,
             createUserProfile
-        } from './pkg/buzz_core.js';
+        } from './pkg/ethanol_rs.js';
 
         async function run() {
             // Initialize the WASM module

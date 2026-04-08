@@ -1,10 +1,13 @@
 [package]
-name = "buzz-core"
+name = "ethanol-rs"
 version = "0.1.0"
-edition = "2024"
-description = "Blood Alcohol Content (BAC) calculator library for mobile and web platforms"
-repository = "https://github.com/yourusername/buzz-core"
+edition = "2021"
+description = "Cross-platform ethanol pharmacokinetics library (Widmark, Watson, absorption modeling)"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/smaragden/ethanol-rs"
+homepage = "https://github.com/smaragden/ethanol-rs"
+keywords = ["bac", "ethanol", "pharmacokinetics", "widmark", "wasm"]
+categories = ["science", "wasm"]
 
 [lib]
 crate-type = ["lib", "staticlib", "cdylib"]

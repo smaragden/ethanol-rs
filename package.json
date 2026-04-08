@@ -1,32 +1,32 @@
 {
-  "name": "buzz-core",
+  "name": "ethanol-rs",
   "version": "0.1.0",
-  "description": "Blood Alcohol Content (BAC) calculator - WebAssembly library for accurate BAC estimation",
+  "description": "Cross-platform ethanol pharmacokinetics library (Widmark, Watson, absorption modeling). Compiles to native (UniFFI) and WASM.",
   "keywords": [
     "bac",
-    "blood-alcohol",
-    "alcohol",
-    "calculator",
+    "ethanol",
+    "pharmacokinetics",
+    "widmark",
+    "watson",
     "wasm",
     "webassembly",
-    "health",
-    "widmark",
-    "watson"
+    "uniffi",
+    "harm-reduction"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "ethanol-rs contributors",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/buzz-core"
+    "url": "https://github.com/smaragden/ethanol-rs"
   },
   "files": [
-    "buzz_core_bg.wasm",
-    "buzz_core.js",
-    "buzz_core.d.ts"
+    "ethanol_rs_bg.wasm",
+    "ethanol_rs.js",
+    "ethanol_rs.d.ts"
   ],
-  "main": "buzz_core.js",
-  "types": "buzz_core.d.ts",
+  "main": "ethanol_rs.js",
+  "types": "ethanol_rs.d.ts",
   "sideEffects": [
-    "buzz_core.js"
+    "ethanol_rs.js"
   ]
 }

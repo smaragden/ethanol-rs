@@ -1,6 +1,6 @@
-# buzz-core WASM Package
+# ethanol-rs WASM Package
 
-This is the WebAssembly build of buzz-core, a Blood Alcohol Content (BAC) calculator library.
+This is the WebAssembly build of ethanol-rs, a cross-platform library for ethanol pharmacokinetics modeling.
 
 ## Building for WASM
 
@@ -40,10 +40,10 @@ npm link ./pkg
 ### Basic Example
 
 ```javascript
-import * as buzzCore from 'buzz-core';
+import * as ethanolRs from 'ethanol-rs';
 
 // Create a user profile
-const profile = buzzCore.createUserProfile(
+const profile = ethanolRs.createUserProfile(
     80.0,        // weight in kg
     "male",      // biological sex
     180.0,       // height in cm
@@ -51,7 +51,7 @@ const profile = buzzCore.createUserProfile(
 );
 
 // Create a drink (beer consumed 30 minutes ago)
-const drink = buzzCore.createDrink(
+const drink = ethanolRs.createDrink(
     330.0,       // volume in ml
     0.05,        // ABV (5%)
     -1800.0,     // offset in seconds (negative = past)
@@ -59,11 +59,11 @@ const drink = buzzCore.createDrink(
 );
 
 // Calculate BAC
-const bac = buzzCore.calculateBAC([drink], profile, "widmark");
+const bac = ethanolRs.calculateBAC([drink], profile, "widmark");
 console.log(`Current BAC: ${bac.toFixed(3)}`);
 
 // Get complete snapshot
-const snapshot = buzzCore.calculateSnapshot(
+const snapshot = ethanolRs.calculateSnapshot(
     [drink],
     profile,
     "widmark",
@@ -83,7 +83,7 @@ console.log('Snapshot:', snapshot);
 ### TypeScript Example
 
 ```typescript
-import * as buzzCore from 'buzz-core';
+import * as ethanolRs from 'ethanol-rs';
 
 interface UserProfile {
     weight_kg: number;
@@ -115,7 +115,7 @@ const drinks: Drink[] = [
     }
 ];
 
-const bac = buzzCore.calculateBAC(drinks, profile, "watson");
+const bac = ethanolRs.calculateBAC(drinks, profile, "watson");
 ```
 
 ## API Reference

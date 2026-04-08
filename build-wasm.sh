@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Building buzz-core for WebAssembly..."
+echo "Building ethanol-rs for WebAssembly..."
 
 # Default target is web
 TARGET=${1:-web}

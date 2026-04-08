@@ -84,16 +84,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
-name = "buzz-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde-wasm-bindgen",
- "uniffi",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "bytes"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -190,6 +180,16 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys",
+]
+
+[[package]]
+name = "ethanol-rs"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde-wasm-bindgen",
+ "uniffi",
+ "wasm-bindgen",
 ]
 
 [[package]]
