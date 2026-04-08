@@ -1,0 +1,18 @@
+# Rust
+/target/
+
+# WASM build outputs
+/pkg/
+/pkg-node/
+/pkg-bundler/
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml

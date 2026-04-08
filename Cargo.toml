@@ -1,0 +1,32 @@
+[package]
+name = "ethanol-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-platform ethanol pharmacokinetics library (Widmark, Watson, absorption modeling)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/smaragden/ethanol-rs"
+homepage = "https://github.com/smaragden/ethanol-rs"
+keywords = ["bac", "ethanol", "pharmacokinetics", "widmark", "wasm"]
+categories = ["science", "wasm"]
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[features]
+default = []
+mobile = ["uniffi"]
+wasm = ["wasm-bindgen", "serde", "serde-wasm-bindgen"]
+
+[dependencies]
+uniffi = { version = "0.29", features = ["cli"], optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+[build-dependencies]
+uniffi = { version = "0.29", features = ["build"], optional = true }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["mobile"]

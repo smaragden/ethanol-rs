@@ -1,0 +1,32 @@
+{
+  "name": "ethanol-rs",
+  "version": "0.1.0",
+  "description": "Cross-platform ethanol pharmacokinetics library (Widmark, Watson, absorption modeling). Compiles to native (UniFFI) and WASM.",
+  "keywords": [
+    "bac",
+    "ethanol",
+    "pharmacokinetics",
+    "widmark",
+    "watson",
+    "wasm",
+    "webassembly",
+    "uniffi",
+    "harm-reduction"
+  ],
+  "author": "ethanol-rs contributors",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smaragden/ethanol-rs"
+  },
+  "files": [
+    "ethanol_rs_bg.wasm",
+    "ethanol_rs.js",
+    "ethanol_rs.d.ts"
+  ],
+  "main": "ethanol_rs.js",
+  "types": "ethanol_rs.d.ts",
+  "sideEffects": [
+    "ethanol_rs.js"
+  ]
+}
