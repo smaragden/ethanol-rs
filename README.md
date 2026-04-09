@@ -2,8 +2,6 @@
 
 Cross-platform Rust library for ethanol pharmacokinetics modeling. Implements peer-reviewed BAC estimation models (Widmark, Watson) with first-order absorption kinetics and zero-order elimination. Compiles to native (iOS/Android via UniFFI) and WebAssembly.
 
-**Powers the [Keel](https://keelapp.dev) harm reduction app for iOS.**
-
 ---
 
 ## Features
