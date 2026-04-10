@@ -73,47 +73,78 @@ pub fn calculate_bac(
     profile: &UserProfile,
     formula: BACFormula,
 ) -> f64 {
+    calculate_bac_at_offset(drinks, profile, formula, 0.0)
+}
+
+/// Calculate BAC at an arbitrary time offset (in seconds) from `t = 0`.
+pub fn calculate_bac_at_offset(
+    drinks: &[Drink],
+    profile: &UserProfile,
+    formula: BACFormula,
+    time_offset_secs: f64,
+) -> f64 {
     if drinks.is_empty() || profile.weight_kg <= 0.0 {
         return 0.0;
     }
 
-    // Sort chronologically and find active session
     let mut sorted = drinks.to_vec();
     sorted.sort_by(|a, b| a.offset_secs.partial_cmp(&b.offset_secs).unwrap());
 
     let session_start = find_session_start(&sorted, profile, formula);
-    let active_drinks = &sorted[session_start..];
+    bac_from_sorted(&sorted[session_start..], profile, formula, time_offset_secs)
+}
+
+/// BAC from an already-sorted, session-resolved slice at an arbitrary evaluation time.
+///
+/// Drinks with `offset_secs > eval_time_secs` are treated as future and skipped.
+/// Does NOT perform session detection — the caller is expected to have sliced the
+/// input appropriately. Keeping this pure is what lets the hot paths hoist session
+/// detection out of inner loops.
+fn bac_from_sorted(
+    sorted: &[Drink],
+    profile: &UserProfile,
+    formula: BACFormula,
+    eval_time_secs: f64,
+) -> f64 {
+    if sorted.is_empty() || profile.weight_kg <= 0.0 {
+        return 0.0;
+    }
+
+    let (weight_grams, gender_constant, tbw) = match formula {
+        BACFormula::Widmark => (
+            profile.weight_kg * 1000.0,
+            profile.biological_sex.gender_constant(),
+            0.0,
+        ),
+        BACFormula::Watson => {
+            let tbw = total_body_water(profile);
+            if tbw <= 0.0 {
+                return 0.0;
+            }
+            (0.0, 0.0, tbw)
+        }
+    };
 
     let mut total_bac = 0.0;
     let mut earliest_offset: Option<f64> = None;
 
-    for drink in active_drinks {
-        // offset_secs is negative for past drinks; hours_elapsed is positive
-        let hours_elapsed = -drink.offset_secs / 3600.0;
-        if hours_elapsed < 0.0 {
+    for drink in sorted {
+        let elapsed_secs = eval_time_secs - drink.offset_secs;
+        if elapsed_secs < 0.0 {
             continue; // future drink, skip
         }
+        let hours_elapsed = elapsed_secs / 3600.0;
 
         let alcohol_grams = drink.volume_ml * drink.abv * ETHANOL_DENSITY;
-
-        // First-order absorption
         let ka = drink.stomach_state.ka();
         let absorption_fraction = 1.0 - (-ka * hours_elapsed).exp();
         let effective_alcohol = alcohol_grams * absorption_fraction;
 
         let drink_bac = match formula {
             BACFormula::Widmark => {
-                let gender_constant = profile.biological_sex.gender_constant();
-                let weight_grams = profile.weight_kg * 1000.0;
                 (effective_alcohol / (weight_grams * gender_constant)) * 100.0
             }
-            BACFormula::Watson => {
-                let tbw = total_body_water(profile);
-                if tbw <= 0.0 {
-                    return 0.0;
-                }
-                (effective_alcohol / (tbw * 800.0)) * 100.0
-            }
+            BACFormula::Watson => (effective_alcohol / (tbw * 800.0)) * 100.0,
         };
 
         total_bac += drink_bac;
@@ -125,71 +156,44 @@ pub fn calculate_bac(
         }
     }
 
-    // Zero-order metabolism: constant rate from first drink
     if let Some(earliest) = earliest_offset {
-        let metabolism_hours = -earliest / 3600.0;
+        let metabolism_hours = (eval_time_secs - earliest) / 3600.0;
         total_bac = (total_bac - metabolism_hours * METABOLISM_RATE).max(0.0);
     }
 
     total_bac
 }
 
-/// Calculate BAC at an arbitrary time offset (in seconds) from `t = 0`.
-///
-/// Shifts all drink offsets by `time_offset_secs` to compute BAC at a different point.
-pub fn calculate_bac_at_offset(
-    drinks: &[Drink],
-    profile: &UserProfile,
-    formula: BACFormula,
-    time_offset_secs: f64,
-) -> f64 {
-    let shifted: Vec<Drink> = drinks
-        .iter()
-        .map(|d| Drink {
-            offset_secs: d.offset_secs - time_offset_secs,
-            ..d.clone()
-        })
-        .collect();
-    calculate_bac(&shifted, profile, formula)
-}
-
 /// Find the index of the first drink in the active drinking session.
 ///
-/// Scans through chronologically sorted drinks and detects session boundaries
-/// where BAC from prior drinks has fully metabolized (≤ 0.001). When a boundary
-/// is found, the metabolism clock restarts from that drink.
+/// Scans chronologically-sorted drinks and detects session boundaries where BAC
+/// from prior drinks has fully metabolized (≤ 0.001) at the time of the next drink.
+/// When a boundary is found the metabolism clock restarts from that drink.
 ///
-/// This prevents unrealistic metabolism accumulation across hours of sobriety.
+/// Session boundaries are a structural property of the drink timings alone, so the
+/// result is independent of query time — which lets curve generation hoist this
+/// call out of its inner loop.
 fn find_session_start(
-    drinks: &[Drink],
+    sorted: &[Drink],
     profile: &UserProfile,
     formula: BACFormula,
 ) -> usize {
-    if drinks.len() <= 1 {
+    if sorted.len() <= 1 {
         return 0;
     }
 
-    // Drinks must be sorted chronologically (most negative offset first)
     let mut session_start = 0;
-
-    for i in 1..drinks.len() {
-        // Compute BAC from session_start..i at the time of drink i
-        // by shifting all drinks so drink i is at t=0
-        let shifted: Vec<Drink> = drinks[session_start..i]
-            .iter()
-            .map(|d| Drink {
-                offset_secs: d.offset_secs - drinks[i].offset_secs,
-                ..d.clone()
-            })
-            .collect();
-
-        let bac_at_new_drink = calculate_bac(&shifted, profile, formula);
-
+    for i in 1..sorted.len() {
+        let bac_at_new_drink = bac_from_sorted(
+            &sorted[session_start..i],
+            profile,
+            formula,
+            sorted[i].offset_secs,
+        );
         if bac_at_new_drink <= 0.001 {
             session_start = i;
         }
     }
-
     session_start
 }
 
@@ -273,11 +277,24 @@ pub fn generate_curve(
     sweet_spot_min: f64,
     sweet_spot_max: f64,
 ) -> Vec<CurvePoint> {
-    let mut points = Vec::new();
+    // Sort and resolve the session boundary a single time for the whole curve.
+    // Session detection is a structural property of the drink set, so it's the
+    // same at every sample point.
+    let mut sorted = drinks.to_vec();
+    sorted.sort_by(|a, b| a.offset_secs.partial_cmp(&b.offset_secs).unwrap());
+    let session_start = find_session_start(&sorted, profile, formula);
+    let active = &sorted[session_start..];
+
+    let capacity = if step_secs > 0.0 {
+        (((to_offset_secs - from_offset_secs) / step_secs).floor() as usize).saturating_add(1)
+    } else {
+        0
+    };
+    let mut points = Vec::with_capacity(capacity);
     let mut offset = from_offset_secs;
 
     while offset <= to_offset_secs {
-        let bac = calculate_bac_at_offset(drinks, profile, formula, offset);
+        let bac = bac_from_sorted(active, profile, formula, offset);
         let zone = crate::zone::classify_zone(bac, sweet_spot_min, sweet_spot_max);
         points.push(CurvePoint {
             offset_secs: offset,
