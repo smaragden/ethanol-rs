@@ -197,14 +197,35 @@ fn find_session_start(
     session_start
 }
 
+/// Sort drinks chronologically and resolve the active session boundary.
+///
+/// Returns the sorted `Vec` and the index of the first drink in the active
+/// session. Callers should slice `sorted[session_start..]` to get the active
+/// drinks, then hand that slice to `bac_from_sorted` one or more times.
+fn sort_and_resolve_session(
+    drinks: &[Drink],
+    profile: &UserProfile,
+    formula: BACFormula,
+) -> (Vec<Drink>, usize) {
+    let mut sorted = drinks.to_vec();
+    sorted.sort_by(|a, b| a.offset_secs.partial_cmp(&b.offset_secs).unwrap());
+    let session_start = find_session_start(&sorted, profile, formula);
+    (sorted, session_start)
+}
+
 /// Determine BAC trajectory by comparing current BAC to 5 minutes ago.
 pub fn trajectory(
     drinks: &[Drink],
     profile: &UserProfile,
     formula: BACFormula,
 ) -> Trajectory {
-    let current = calculate_bac(drinks, profile, formula);
-    let past = calculate_bac_at_offset(drinks, profile, formula, -TRAJECTORY_WINDOW_SECS);
+    if drinks.is_empty() || profile.weight_kg <= 0.0 {
+        return Trajectory::Stable;
+    }
+    let (sorted, session_start) = sort_and_resolve_session(drinks, profile, formula);
+    let active = &sorted[session_start..];
+    let current = bac_from_sorted(active, profile, formula, 0.0);
+    let past = bac_from_sorted(active, profile, formula, -TRAJECTORY_WINDOW_SECS);
 
     let diff = current - past;
     if diff > 0.001 {
@@ -239,8 +260,31 @@ pub fn snapshot(
     sweet_spot_min: f64,
     sweet_spot_max: f64,
 ) -> BACSnapshot {
-    let bac = calculate_bac(drinks, profile, formula);
-    let traj = trajectory(drinks, profile, formula);
+    if drinks.is_empty() || profile.weight_kg <= 0.0 {
+        return BACSnapshot {
+            bac: 0.0,
+            trajectory: Trajectory::Stable,
+            zone: crate::zone::classify_zone(0.0, sweet_spot_min, sweet_spot_max),
+            time_to_sober_secs: None,
+        };
+    }
+
+    // Sort + session-detect once, reuse for current, past, and zone.
+    let (sorted, session_start) = sort_and_resolve_session(drinks, profile, formula);
+    let active = &sorted[session_start..];
+
+    let bac = bac_from_sorted(active, profile, formula, 0.0);
+    let past = bac_from_sorted(active, profile, formula, -TRAJECTORY_WINDOW_SECS);
+
+    let diff = bac - past;
+    let traj = if diff > 0.001 {
+        Trajectory::Rising
+    } else if diff < -0.001 {
+        Trajectory::Falling
+    } else {
+        Trajectory::Stable
+    };
+
     let zone = crate::zone::classify_zone(bac, sweet_spot_min, sweet_spot_max);
     let time_to_sober_secs = estimate_time_to_sober(bac);
 
@@ -280,9 +324,7 @@ pub fn generate_curve(
     // Sort and resolve the session boundary a single time for the whole curve.
     // Session detection is a structural property of the drink set, so it's the
     // same at every sample point.
-    let mut sorted = drinks.to_vec();
-    sorted.sort_by(|a, b| a.offset_secs.partial_cmp(&b.offset_secs).unwrap());
-    let session_start = find_session_start(&sorted, profile, formula);
+    let (sorted, session_start) = sort_and_resolve_session(drinks, profile, formula);
     let active = &sorted[session_start..];
 
     let capacity = if step_secs > 0.0 {
@@ -352,7 +394,15 @@ pub fn minutes_until_sober(
     profile: &UserProfile,
     formula: BACFormula,
 ) -> f64 {
-    let current_bac = calculate_bac(drinks, profile, formula);
+    if drinks.is_empty() || profile.weight_kg <= 0.0 {
+        return 0.0;
+    }
+
+    // Sort + session detect ONCE; all scan samples reuse the active slice.
+    let (sorted, session_start) = sort_and_resolve_session(drinks, profile, formula);
+    let active = &sorted[session_start..];
+
+    let current_bac = bac_from_sorted(active, profile, formula, 0.0);
     if current_bac <= 0.001 {
         return 0.0;
     }
@@ -365,7 +415,7 @@ pub fn minutes_until_sober(
     let mut found_minute = max_minutes;
     while coarse_minute <= max_minutes {
         let offset_secs = coarse_minute * 60.0;
-        let bac = calculate_bac_at_offset(drinks, profile, formula, offset_secs);
+        let bac = bac_from_sorted(active, profile, formula, offset_secs);
         if bac <= 0.001 {
             found_minute = coarse_minute;
             break;
@@ -378,7 +428,7 @@ pub fn minutes_until_sober(
     let mut fine_minute = fine_start;
     while fine_minute <= found_minute {
         let offset_secs = fine_minute * 60.0;
-        let bac = calculate_bac_at_offset(drinks, profile, formula, offset_secs);
+        let bac = bac_from_sorted(active, profile, formula, offset_secs);
         if bac <= 0.001 {
             return fine_minute;
         }
