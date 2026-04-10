@@ -109,38 +109,49 @@ fn bench_generate_curve_resolution(c: &mut Criterion) {
 
 fn bench_snapshot(c: &mut Criterion) {
     let profile = profile();
-    let drinks = drinks_over(20, 4.0 * 3600.0);
-    c.bench_function("snapshot/20_drinks", |b| {
-        b.iter(|| {
-            snapshot(
-                black_box(&drinks),
-                black_box(&profile),
-                BACFormula::Widmark,
-                0.06,
-                0.09,
-            )
+    let mut group = c.benchmark_group("snapshot");
+    for n in [1usize, 10, 50, 100, 200] {
+        let drinks = drinks_over(n, 4.0 * 3600.0);
+        group.throughput(Throughput::Elements(n as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(n), &drinks, |b, d| {
+            b.iter(|| {
+                snapshot(
+                    black_box(d),
+                    black_box(&profile),
+                    BACFormula::Widmark,
+                    0.06,
+                    0.09,
+                )
+            });
         });
-    });
+    }
+    group.finish();
 }
 
 fn bench_trajectory(c: &mut Criterion) {
     let profile = profile();
-    let drinks = drinks_over(20, 4.0 * 3600.0);
-    c.bench_function("trajectory/20_drinks", |b| {
-        b.iter(|| trajectory(black_box(&drinks), black_box(&profile), BACFormula::Widmark));
-    });
+    let mut group = c.benchmark_group("trajectory");
+    for n in [1usize, 10, 50, 100, 200] {
+        let drinks = drinks_over(n, 4.0 * 3600.0);
+        group.throughput(Throughput::Elements(n as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(n), &drinks, |b, d| {
+            b.iter(|| trajectory(black_box(d), black_box(&profile), BACFormula::Widmark));
+        });
+    }
+    group.finish();
 }
 
 fn bench_minutes_until_sober(c: &mut Criterion) {
     let profile = profile();
-    let drinks = drinks_over(20, 4.0 * 3600.0);
     let mut group = c.benchmark_group("minutes_until_sober");
     group.sample_size(20);
-    group.bench_function("20_drinks", |b| {
-        b.iter(|| {
-            minutes_until_sober(black_box(&drinks), black_box(&profile), BACFormula::Widmark)
+    for n in [1usize, 10, 50, 100, 200] {
+        let drinks = drinks_over(n, 4.0 * 3600.0);
+        group.throughput(Throughput::Elements(n as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(n), &drinks, |b, d| {
+            b.iter(|| minutes_until_sober(black_box(d), black_box(&profile), BACFormula::Widmark));
         });
-    });
+    }
     group.finish();
 }
 
