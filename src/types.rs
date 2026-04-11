@@ -1,8 +1,8 @@
 /// Biological sex for BAC calculation (affects body water distribution).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Enum))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "wasm", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum BiologicalSex {
     Male,
     Female,
@@ -23,8 +23,8 @@ impl BiologicalSex {
 /// Stomach fullness — affects alcohol absorption rate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Enum))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "wasm", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum StomachState {
     Empty,
     SomeFood,
@@ -45,8 +45,8 @@ impl StomachState {
 /// BAC formula selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Enum))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "wasm", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum BACFormula {
     #[default]
     Widmark,
@@ -56,8 +56,8 @@ pub enum BACFormula {
 /// BAC spectrum zone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Enum))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "wasm", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum BACZone {
     Sober,
     BelowSweetSpot,
@@ -69,8 +69,8 @@ pub enum BACZone {
 /// BAC trajectory direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Enum))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "wasm", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Trajectory {
     Rising,
     Falling,

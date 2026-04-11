@@ -309,8 +309,16 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "serde",
- "serde-wasm-bindgen",
  "uniffi",
+]
+
+[[package]]
+name = "ethanol-rs-wasm"
+version = "0.1.0"
+dependencies = [
+ "ethanol-rs",
+ "serde",
+ "serde-wasm-bindgen",
  "wasm-bindgen",
 ]
 

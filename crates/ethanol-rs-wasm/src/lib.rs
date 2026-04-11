@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
-use crate::bac::{Drink, UserProfile};
-use crate::types::{BACFormula, BiologicalSex, StomachState};
+use ethanol_rs::bac::{Drink, UserProfile};
+use ethanol_rs::types::{BACFormula, BiologicalSex, StomachState};
 
 /// Calculate BAC from a set of drinks.
 ///
@@ -24,7 +24,7 @@ pub fn calculate_bac(
     let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
         .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
 
-    Ok(crate::bac::calculate_bac(&drinks, &profile, formula))
+    Ok(ethanol_rs::bac::calculate_bac(&drinks, &profile, formula))
 }
 
 /// Calculate BAC trajectory (rising, falling, or stable).
@@ -49,7 +49,7 @@ pub fn calculate_trajectory(
     let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
         .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
 
-    let trajectory = crate::bac::trajectory(&drinks, &profile, formula);
+    let trajectory = ethanol_rs::bac::trajectory(&drinks, &profile, formula);
     serde_wasm_bindgen::to_value(&trajectory)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
@@ -80,7 +80,7 @@ pub fn calculate_snapshot(
     let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
         .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
 
-    let snapshot = crate::bac::snapshot(&drinks, &profile, formula, sweet_spot_min, sweet_spot_max);
+    let snapshot = ethanol_rs::bac::snapshot(&drinks, &profile, formula, sweet_spot_min, sweet_spot_max);
     serde_wasm_bindgen::to_value(&snapshot)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
@@ -94,7 +94,7 @@ pub fn calculate_snapshot(
 /// Seconds until sober, or null if already sober
 #[wasm_bindgen(js_name = estimateTimeToSober)]
 pub fn estimate_time_to_sober(current_bac: f64) -> Option<f64> {
-    crate::bac::estimate_time_to_sober(current_bac)
+    ethanol_rs::bac::estimate_time_to_sober(current_bac)
 }
 
 /// Count drinks still being absorbed.
@@ -109,7 +109,7 @@ pub fn count_absorbing_drinks(drinks: JsValue) -> Result<u32, JsValue> {
     let drinks: Vec<Drink> = serde_wasm_bindgen::from_value(drinks)
         .map_err(|e| JsValue::from_str(&format!("Invalid drinks: {}", e)))?;
 
-    Ok(crate::bac::absorbing_drink_count(&drinks) as u32)
+    Ok(ethanol_rs::bac::absorbing_drink_count(&drinks) as u32)
 }
 
 /// Classify a BAC value into a zone.
@@ -127,7 +127,7 @@ pub fn classify_zone(
     sweet_spot_min: f64,
     sweet_spot_max: f64,
 ) -> Result<JsValue, JsValue> {
-    let zone = crate::zone::classify_zone(bac, sweet_spot_min, sweet_spot_max);
+    let zone = ethanol_rs::zone::classify_zone(bac, sweet_spot_min, sweet_spot_max);
     serde_wasm_bindgen::to_value(&zone)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
@@ -222,7 +222,7 @@ pub fn generate_curve(
     let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
         .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
 
-    let points = crate::bac::generate_curve(
+    let points = ethanol_rs::bac::generate_curve(
         &drinks,
         &profile,
         formula,
@@ -259,5 +259,5 @@ pub fn minutes_until_sober(
     let formula: BACFormula = serde_wasm_bindgen::from_value(formula)
         .map_err(|e| JsValue::from_str(&format!("Invalid formula: {}", e)))?;
 
-    Ok(crate::bac::minutes_until_sober(&drinks, &profile, formula))
+    Ok(ethanol_rs::bac::minutes_until_sober(&drinks, &profile, formula))
 }

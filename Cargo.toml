@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/ethanol-rs-wasm"]
+
 [package]
 name = "ethanol-rs"
 version = "0.1.0"
@@ -6,22 +9,28 @@ description = "Cross-platform ethanol pharmacokinetics library (Widmark, Watson,
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/smaragden/ethanol-rs"
 homepage = "https://github.com/smaragden/ethanol-rs"
-keywords = ["bac", "ethanol", "pharmacokinetics", "widmark", "wasm"]
-categories = ["science", "wasm"]
+keywords = ["bac", "ethanol", "pharmacokinetics", "widmark"]
+categories = ["science"]
 
 [lib]
-crate-type = ["lib", "staticlib", "cdylib"]
+# `lib` (rlib) is the default for Rust consumers. `staticlib` is kept so
+# iOS builds can link the .a directly. `cdylib` is *not* declared here —
+# leaving it in forces every transitive Rust consumer to build a cdylib
+# on every target, which fails under Nix's cc-wrapper when cross-compiling
+# to iOS simulator (libiconv.dylib links for macOS, not iOS sim).
+#
+# The WASM target lives in crates/ethanol-rs-wasm, which declares cdylib
+# itself and depends on ethanol-rs as a normal Rust library.
+crate-type = ["lib", "staticlib"]
 
 [features]
 default = []
 mobile = ["uniffi"]
-wasm = ["wasm-bindgen", "serde", "serde-wasm-bindgen"]
+serde = ["dep:serde"]
 
 [dependencies]
 uniffi = { version = "0.29", features = ["cli"], optional = true }
-wasm-bindgen = { version = "0.2", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde-wasm-bindgen = { version = "0.6", optional = true }
 
 [build-dependencies]
 uniffi = { version = "0.29", features = ["build"], optional = true }
