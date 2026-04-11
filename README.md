@@ -43,7 +43,8 @@ fn main() {
         Drink {
             volume_ml: 150.0,      // Standard wine glass
             abv: 0.12,             // 12% alcohol
-            offset_secs: -1800.0,  // 30 minutes ago
+            offset_secs: -1800.0,  // started 30 minutes ago
+            duration_secs: 900.0,  // sipped over 15 minutes
             stomach_state: StomachState::SomeFood,
         },
     ];
@@ -274,7 +275,8 @@ pub struct UserProfile {
 pub struct Drink {
     pub volume_ml: f64,
     pub abv: f64,              // Fraction (0.05 = 5%)
-    pub offset_secs: f64,      // Negative for past drinks
+    pub offset_secs: f64,      // Start of drink. Negative for past drinks.
+    pub duration_secs: f64,    // How long the drink is consumed over. 0 = instantaneous.
     pub stomach_state: StomachState,  // Empty, SomeFood, Full
 }
 

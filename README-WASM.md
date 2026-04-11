@@ -95,7 +95,8 @@ interface UserProfile {
 interface Drink {
     volume_ml: number;
     abv: number;
-    offset_secs: number;
+    offset_secs: number;            // start of drink, negative for past drinks
+    duration_secs?: number;         // sip duration in seconds; 0 (default) = instantaneous
     stomach_state: "empty" | "some_food" | "full";
 }
 
@@ -110,7 +111,8 @@ const drinks: Drink[] = [
     {
         volume_ml: 150,
         abv: 0.12,
-        offset_secs: -3600,
+        offset_secs: -3600,       // started 1h ago
+        duration_secs: 900,        // sipped over 15 min
         stomach_state: "some_food"
     }
 ];
@@ -151,8 +153,9 @@ Count drinks still being absorbed.
 
 ### Helper Functions
 
-#### `createDrink(volumeMl, abv, offsetSecs, stomachState)`
-Create a drink object.
+#### `createDrink(volumeMl, abv, offsetSecs, durationSecs, stomachState)`
+Create a drink object. Pass `0` for `durationSecs` to model an instantaneous
+drink (e.g. a shot).
 
 #### `createUserProfile(weightKg, biologicalSex, heightCm, age)`
 Create a user profile object.

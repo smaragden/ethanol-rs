@@ -18,9 +18,18 @@ pub struct Drink {
     pub volume_ml: f64,
     /// Alcohol by volume as a fraction (e.g., 0.05 for 5%).
     pub abv: f64,
-    /// Seconds since the reference time (negative = in the past).
-    /// For a drink logged 30 minutes ago: `offset_secs = -1800.0`.
+    /// Seconds since the reference time at which the user *started* drinking
+    /// (negative = in the past). For a drink begun 30 minutes ago:
+    /// `offset_secs = -1800.0`.
     pub offset_secs: f64,
+    /// Duration over which the drink is consumed, in seconds. The drink is
+    /// modeled as a constant-rate infusion into the stomach from `offset_secs`
+    /// to `offset_secs + duration_secs`. A value of `0.0` collapses the drink
+    /// to an instantaneous impulse at `offset_secs` — this is the
+    /// backwards-compatible default for callers that don't care about sip
+    /// duration.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub duration_secs: f64,
     /// Stomach state at time of drink.
     pub stomach_state: StomachState,
 }
@@ -129,15 +138,18 @@ fn bac_from_sorted(
     let mut earliest_offset: Option<f64> = None;
 
     for drink in sorted {
-        let elapsed_secs = eval_time_secs - drink.offset_secs;
-        if elapsed_secs < 0.0 {
+        if eval_time_secs < drink.offset_secs {
             continue; // future drink, skip
         }
-        let hours_elapsed = elapsed_secs / 3600.0;
 
         let alcohol_grams = drink.volume_ml * drink.abv * ETHANOL_DENSITY;
         let ka = drink.stomach_state.ka();
-        let absorption_fraction = 1.0 - (-ka * hours_elapsed).exp();
+        let absorption_fraction = absorbed_fraction(
+            drink.offset_secs,
+            drink.duration_secs,
+            ka,
+            eval_time_secs,
+        );
         let effective_alcohol = alcohol_grams * absorption_fraction;
 
         let drink_bac = match formula {
@@ -349,6 +361,54 @@ pub fn generate_curve(
     points
 }
 
+/// Fraction of a drink's dose absorbed into the bloodstream at `eval_time_secs`,
+/// given a drink consumed as a constant-rate infusion from `offset_secs` to
+/// `offset_secs + duration_secs`, followed by first-order absorption with rate
+/// constant `ka` (per hour).
+///
+/// Returns `0.0` if the drink hasn't started yet. Reduces exactly to the
+/// classic impulse solution `1 - exp(-ka * tau)` when `duration_secs <= 0`.
+///
+/// Derivation: let `G(t)` be the amount of ethanol in the gut compartment.
+/// With a constant input rate `D/T` over `[0, T]` and first-order output
+/// `ka * G`, the closed form of the absorbed fraction `F(tau)` is:
+///
+/// ```text
+/// during sip (0 <= tau <= T):
+///     F(tau) = (1/T) * (tau - (1 - exp(-ka * tau)) / ka)
+///
+/// after sip (tau > T):
+///     F(tau) = 1 - (1 - exp(-ka * T)) / (T * ka) * exp(-ka * (tau - T))
+/// ```
+///
+/// Both branches are continuous at `tau = T` and agree with the impulse form
+/// in the limit `T -> 0`.
+fn absorbed_fraction(
+    offset_secs: f64,
+    duration_secs: f64,
+    ka: f64,
+    eval_time_secs: f64,
+) -> f64 {
+    let elapsed_secs = eval_time_secs - offset_secs;
+    if elapsed_secs <= 0.0 {
+        return 0.0;
+    }
+    let tau = elapsed_secs / 3600.0;
+
+    if duration_secs <= 0.0 {
+        return 1.0 - (-ka * tau).exp();
+    }
+
+    let big_t = duration_secs / 3600.0;
+    if tau <= big_t {
+        // During-sip branch.
+        (tau - (1.0 - (-ka * tau).exp()) / ka) / big_t
+    } else {
+        // Post-sip branch.
+        1.0 - (1.0 - (-ka * big_t).exp()) / (big_t * ka) * (-ka * (tau - big_t)).exp()
+    }
+}
+
 /// Watson total body water estimation (liters).
 fn total_body_water(profile: &UserProfile) -> f64 {
     let age = profile.age as f64;
@@ -366,17 +426,20 @@ fn total_body_water(profile: &UserProfile) -> f64 {
     }
 }
 
-/// Count drinks still being actively absorbed (< 95% absorbed).
+/// Count drinks still being actively absorbed (< 95% absorbed) at `t = 0`.
 pub fn absorbing_drink_count(drinks: &[Drink]) -> usize {
     drinks
         .iter()
         .filter(|d| {
-            let hours = -d.offset_secs / 3600.0;
-            if hours < 0.0 {
-                return false;
+            if d.offset_secs > 0.0 {
+                return false; // hasn't started yet
             }
-            let ka = d.stomach_state.ka();
-            let fraction = 1.0 - (-ka * hours).exp();
+            let fraction = absorbed_fraction(
+                d.offset_secs,
+                d.duration_secs,
+                d.stomach_state.ka(),
+                0.0,
+            );
             fraction < 0.95
         })
         .count()
@@ -531,6 +594,17 @@ mod tests {
             volume_ml: 330.0,
             abv: 0.05,
             offset_secs,
+            duration_secs: 0.0,
+            stomach_state: StomachState::Empty,
+        }
+    }
+
+    fn sipped_beer(offset_secs: f64, duration_secs: f64) -> Drink {
+        Drink {
+            volume_ml: 330.0,
+            abv: 0.05,
+            offset_secs,
+            duration_secs,
             stomach_state: StomachState::Empty,
         }
     }
@@ -810,6 +884,161 @@ mod tests {
         let bac = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
         // Should have some positive BAC from the recent beer
         assert!(bac >= 0.0);
+    }
+
+    #[test]
+    fn absorbed_fraction_zero_duration_matches_impulse() {
+        // Regression guard: the infusion formula must collapse exactly to the
+        // impulse formula when duration_secs == 0.
+        for tau_hours in [0.1f64, 0.5, 1.0, 2.0, 4.0] {
+            for ka in [1.5f64, 2.5, 4.0] {
+                let elapsed_secs = tau_hours * 3600.0;
+                let impulse = absorbed_fraction(0.0, 0.0, ka, elapsed_secs);
+                let expected = 1.0 - (-ka * tau_hours).exp();
+                assert!(
+                    (impulse - expected).abs() < 1e-12,
+                    "impulse formula drift at ka={ka}, tau={tau_hours}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn absorbed_fraction_is_continuous_at_sip_end() {
+        // The during-sip and after-sip branches must agree at tau == T.
+        let ka = 4.0;
+        let duration = 1800.0; // 30 min
+        // Evaluate just inside and at the boundary.
+        let during = absorbed_fraction(0.0, duration, ka, duration);
+        let after = absorbed_fraction(0.0, duration, ka, duration + 1.0e-6);
+        assert!(
+            (during - after).abs() < 1e-9,
+            "sip boundary discontinuous: during={during}, after={after}"
+        );
+    }
+
+    #[test]
+    fn absorbed_fraction_monotonic_over_sip() {
+        // Absorbed fraction should be strictly increasing while the drink is
+        // being consumed and while it continues absorbing afterwards.
+        let ka = 2.5;
+        let duration = 1500.0; // 25 min
+        let mut prev = 0.0;
+        for step in 1..120 {
+            let t = step as f64 * 60.0;
+            let f = absorbed_fraction(0.0, duration, ka, t);
+            assert!(
+                f > prev - 1e-12,
+                "non-monotonic at t={t}: prev={prev}, f={f}"
+            );
+            prev = f;
+        }
+    }
+
+    #[test]
+    fn duration_zero_drink_equals_legacy_bac() {
+        // Same inputs, both paths: duration==0 must match what the old code
+        // would have computed (which is what `beer(-1800.0)` exercises today).
+        let legacy = calculate_bac(&[beer(-1800.0)], &male_80kg(), BACFormula::Widmark);
+        let explicit_zero = calculate_bac(
+            &[sipped_beer(-1800.0, 0.0)],
+            &male_80kg(),
+            BACFormula::Widmark,
+        );
+        assert!(
+            (legacy - explicit_zero).abs() < 1e-12,
+            "legacy={legacy}, explicit_zero={explicit_zero}"
+        );
+    }
+
+    #[test]
+    fn sipped_drink_lower_bac_than_impulse_at_same_end_time() {
+        // Drink started 30 min ago. One finished instantly (impulse),
+        // the other sipped over the full 30 min, finishing right now.
+        // At t=0, the impulse has had 30 min to cross into blood while the
+        // sipped drink averaged only ~15 min of absorption time — so the
+        // impulse BAC must be strictly higher.
+        let impulse = calculate_bac(&[beer(-1800.0)], &male_80kg(), BACFormula::Widmark);
+        let sipped = calculate_bac(
+            &[sipped_beer(-1800.0, 1800.0)],
+            &male_80kg(),
+            BACFormula::Widmark,
+        );
+        assert!(
+            impulse > sipped,
+            "impulse ({impulse}) should exceed sipped ({sipped})"
+        );
+        assert!(sipped > 0.0, "sipped BAC should still be positive");
+    }
+
+    #[test]
+    fn absorbed_fraction_in_progress_positive_and_below_impulse() {
+        // At t=0 a drink started 10 min ago with a 30-min duration is halfway
+        // through being sipped. Some fraction must be absorbed (>0), and it
+        // must be strictly less than the impulse equivalent where the entire
+        // dose has been in the gut for the full 10 minutes.
+        let ka = 4.0;
+        let in_progress = absorbed_fraction(-600.0, 1800.0, ka, 0.0);
+        let impulse = absorbed_fraction(-600.0, 0.0, ka, 0.0);
+        assert!(in_progress > 0.0, "in-progress fraction should be > 0");
+        assert!(
+            in_progress < impulse,
+            "in-progress ({in_progress}) should be below impulse ({impulse})"
+        );
+    }
+
+    #[test]
+    fn future_sipped_drink_ignored() {
+        // Starts 10 min from now, duration 20 min — entirely in the future.
+        let bac = calculate_bac(
+            &[sipped_beer(600.0, 1200.0)],
+            &male_80kg(),
+            BACFormula::Widmark,
+        );
+        assert_eq!(bac, 0.0);
+    }
+
+    #[test]
+    fn sipped_drink_peak_arrives_later_than_impulse() {
+        // Sample BAC over the hour after a drink starts. The sipped version
+        // peaks strictly later than the impulse version.
+        let profile = male_80kg();
+        let impulse_curve =
+            generate_curve(&[beer(0.0)], &profile, BACFormula::Widmark, 0.0, 7200.0, 60.0, 0.06, 0.09);
+        let sipped_curve = generate_curve(
+            &[sipped_beer(0.0, 1800.0)],
+            &profile,
+            BACFormula::Widmark,
+            0.0,
+            7200.0,
+            60.0,
+            0.06,
+            0.09,
+        );
+        let peak = |c: &Vec<CurvePoint>| {
+            c.iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.bac.partial_cmp(&b.bac).unwrap())
+                .map(|(i, p)| (i, p.bac))
+                .unwrap()
+        };
+        let (impulse_idx, impulse_peak) = peak(&impulse_curve);
+        let (sipped_idx, sipped_peak) = peak(&sipped_curve);
+        assert!(
+            sipped_idx > impulse_idx,
+            "sipped peak idx {sipped_idx} should be later than impulse peak idx {impulse_idx}"
+        );
+        assert!(
+            sipped_peak < impulse_peak,
+            "sipped peak BAC {sipped_peak} should be lower than impulse peak {impulse_peak}"
+        );
+    }
+
+    #[test]
+    fn absorbing_drink_count_includes_in_progress_sipped_drink() {
+        // In-progress drink (not yet finished) must count as absorbing.
+        let drinks = vec![sipped_beer(-300.0, 1500.0)]; // 5 min in, 20 min to go
+        assert_eq!(absorbing_drink_count(&drinks), 1);
     }
 
     #[test]
