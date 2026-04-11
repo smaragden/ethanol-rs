@@ -12,7 +12,7 @@ const TRAJECTORY_WINDOW_SECS: f64 = 300.0;
 /// A single drink for BAC calculation.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Drink {
     /// Volume in milliliters.
     pub volume_ml: f64,
@@ -28,7 +28,7 @@ pub struct Drink {
 /// User's physical profile for BAC calculation.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UserProfile {
     /// Weight in kilograms.
     pub weight_kg: f64,
@@ -42,7 +42,7 @@ pub struct UserProfile {
 /// Complete BAC snapshot at a point in time.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BACSnapshot {
     pub bac: f64,
     pub trajectory: Trajectory,
@@ -54,7 +54,7 @@ pub struct BACSnapshot {
 /// A single point in a BAC curve.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
-#[cfg_attr(feature = "wasm", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CurvePoint {
     /// Time offset in seconds from the reference time.
     pub offset_secs: f64,
