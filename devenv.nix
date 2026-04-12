@@ -6,9 +6,18 @@
     pkgs.wasm-pack
   ];
 
-  languages.rust = {
-    enable = true;
-    channel = "stable";
-    targets = [ "wasm32-unknown-unknown" ];
+  languages = {
+    rust = {
+      enable = true;
+      channel = "stable";
+      targets = [ "wasm32-unknown-unknown" ];
+    };
+    javascript = {
+      enable = true;
+      pnpm = {
+        enable = true;
+        install.enable = false;
+      };
+    };
   };
 }
