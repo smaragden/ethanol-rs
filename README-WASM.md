@@ -2,6 +2,13 @@
 
 This is the WebAssembly build of ethanol-rs, a cross-platform library for ethanol pharmacokinetics modeling.
 
+> **NOT CLINICALLY VALIDATED.** Core BAC formulas (Widmark, Watson) are
+> peer-reviewed, but some features (e.g. duration-aware sipping) are
+> simplified heuristics. This implementation has **not** been validated
+> against measured BAC. **Do not rely on it to decide whether it is safe to
+> drive, operate machinery, take medication, or for any medical, legal, or
+> safety-critical purpose.** Use at your own risk.
+
 ## Building for WASM
 
 ### Prerequisites
@@ -95,7 +102,8 @@ interface UserProfile {
 interface Drink {
     volume_ml: number;
     abv: number;
-    offset_secs: number;
+    offset_secs: number;            // start of drink, negative for past drinks
+    duration_secs?: number;         // sip duration in seconds; 0 (default) = instantaneous
     stomach_state: "empty" | "some_food" | "full";
 }
 
@@ -110,7 +118,8 @@ const drinks: Drink[] = [
     {
         volume_ml: 150,
         abv: 0.12,
-        offset_secs: -3600,
+        offset_secs: -3600,       // started 1h ago
+        duration_secs: 900,        // sipped over 15 min
         stomach_state: "some_food"
     }
 ];
@@ -151,8 +160,9 @@ Count drinks still being absorbed.
 
 ### Helper Functions
 
-#### `createDrink(volumeMl, abv, offsetSecs, stomachState)`
-Create a drink object.
+#### `createDrink(volumeMl, abv, offsetSecs, durationSecs, stomachState)`
+Create a drink object. Pass `0` for `durationSecs` to model an instantaneous
+drink (e.g. a shot).
 
 #### `createUserProfile(weightKg, biologicalSex, heightCm, age)`
 Create a user profile object.

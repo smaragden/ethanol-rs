@@ -91,14 +91,16 @@
                     const drink1 = createDrink(
                         330.0,       // volume in ml
                         0.05,        // ABV (5%)
-                        -3600.0,     // 1 hour ago
+                        -3600.0,     // started 1 hour ago
+                        0.0,         // instantaneous (no sip duration)
                         "empty"      // stomach state
                     );
 
                     const drink2 = createDrink(
                         330.0,       // volume in ml
                         0.05,        // ABV (5%)
-                        -1800.0,     // 30 minutes ago
+                        -1800.0,     // started 30 minutes ago
+                        0.0,         // instantaneous (no sip duration)
                         "empty"      // stomach state
                     );
 

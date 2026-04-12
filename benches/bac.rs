@@ -26,6 +26,7 @@ fn drinks_over(n: usize, span_secs: f64) -> Vec<Drink> {
                 volume_ml: 330.0,
                 abv: 0.05,
                 offset_secs: t,
+                duration_secs: 0.0,
                 stomach_state: StomachState::Empty,
             }
         })

@@ -139,13 +139,17 @@ pub fn classify_zone(
 /// # Parameters
 /// - `volumeMl`: Volume in milliliters
 /// - `abv`: Alcohol by volume (0.05 for 5%)
-/// - `offsetSecs`: Seconds since now (negative for past drinks)
+/// - `offsetSecs`: Seconds since now at which the user started the drink
+///   (negative for past drinks)
+/// - `durationSecs`: How long the drink is/was consumed over, in seconds.
+///   Pass `0` for an instantaneous drink (e.g. a shot).
 /// - `stomachState`: "empty", "some_food", or "full"
 #[wasm_bindgen(js_name = createDrink)]
 pub fn create_drink(
     volume_ml: f64,
     abv: f64,
     offset_secs: f64,
+    duration_secs: f64,
     stomach_state: JsValue,
 ) -> Result<JsValue, JsValue> {
     let stomach_state: StomachState = serde_wasm_bindgen::from_value(stomach_state)
@@ -155,6 +159,7 @@ pub fn create_drink(
         volume_ml,
         abv,
         offset_secs,
+        duration_secs,
         stomach_state,
     };
 
