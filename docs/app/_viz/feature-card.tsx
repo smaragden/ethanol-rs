@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { CodeBlock } from "./code-block";
 
 interface FeatureCardProps {
   title: string;
   description: ReactNode;
   viz: ReactNode;
   code: string;
-  language?: string;
+  highlights?: number[];
 }
 
 export function FeatureCard({
@@ -15,7 +16,7 @@ export function FeatureCard({
   description,
   viz,
   code,
-  language = "ts",
+  highlights,
 }: FeatureCardProps) {
   const [showCode, setShowCode] = useState(false);
   return (
@@ -37,9 +38,7 @@ export function FeatureCard({
           {showCode ? "– hide code" : "+ show code"}
         </button>
         {showCode && (
-          <pre className="max-w-full overflow-x-auto rounded-lg border border-outline-variant/10 bg-black/40 p-4 text-[12px] leading-relaxed text-on-surface-variant/80">
-            <code className={`language-${language}`}>{code}</code>
-          </pre>
+          <CodeBlock code={code} highlights={highlights} />
         )}
       </div>
     </section>

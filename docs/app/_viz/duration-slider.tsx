@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useWasm, type RustCurvePoint, type RustDrink, type RustProfile } from "./use-wasm";
 import { CurveChart, type ChartPoint, type ChartSeries } from "./curve-chart";
 
@@ -38,9 +38,16 @@ function curveFor(
   return pts.map((p) => ({ minute: p.offset_secs / 60, bac: p.bac }));
 }
 
-export function DurationSliderViz() {
+interface DurationSliderVizProps {
+  durationMin: number;
+  onDurationChange: (value: number) => void;
+}
+
+export function DurationSliderViz({
+  durationMin,
+  onDurationChange,
+}: DurationSliderVizProps) {
   const mod = useWasm();
-  const [durationMin, setDurationMin] = useState(30);
 
   const reference = useMemo(() => curveFor(mod, 0), [mod]);
   const points = useMemo(
@@ -69,7 +76,7 @@ export function DurationSliderViz() {
           max={90}
           step={5}
           value={durationMin}
-          onChange={(e) => setDurationMin(Number(e.target.value))}
+          onChange={(e) => onDurationChange(Number(e.target.value))}
           className="flex-1 accent-primary"
         />
         <span className="font-display tabular-nums text-sm text-on-surface">
