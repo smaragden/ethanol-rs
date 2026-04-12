@@ -1,12 +1,12 @@
 import { Simulator } from "./simulator/components/simulator";
 import { FeatureCard } from "./_viz/feature-card";
 import { FormulaCompareViz } from "./_viz/formula-compare";
-import { DurationSliderViz } from "./_viz/duration-slider";
+import { DurationCard } from "./_viz/duration-card";
 import { SessionDetectionViz } from "./_viz/session-detection";
 import { WeightSensitivityViz } from "./_viz/weight-sensitivity";
 import { SexCompareViz } from "./_viz/sex-compare";
 import { StomachStateViz } from "./_viz/stomach-state";
-import { TimeToSoberViz } from "./_viz/time-to-sober";
+import { TimeToSoberCard } from "./_viz/time-to-sober-card";
 
 const GITHUB_URL = "https://github.com/smaragden/ethanol-rs";
 
@@ -63,81 +63,145 @@ export default function Home() {
             title="Widmark vs Watson"
             description="Same drinks, same profile, two different formulas. Widmark is the classic one (body weight and a sex-based constant). Watson tries to estimate total body water from weight, height and age. For most people they agree closely; at the extremes they start to bicker."
             viz={<FormulaCompareViz />}
-            code={`import { calculateBAC, generateCurve } from "ethanol-rs";
+            code={`import { generateCurve } from "ethanol-rs";
 
-const widmark = generateCurve(drinks, profile, "widmark",
-  0, 6 * 3600, 60, 0.06, 0.09);
-const watson  = generateCurve(drinks, profile, "watson",
-  0, 6 * 3600, 60, 0.06, 0.09);`}
-          />
-
-          <FeatureCard
-            title="Drink duration flattens the peak"
-            description="`duration_secs` treats a drink as a constant-rate infusion. Shot it and you get a tall spike. Sip the same thing over an hour and the peak drops by 30-40%, with a longer tail to match."
-            viz={<DurationSliderViz />}
-            code={`const drink = {
-  volume_ml: 500, abv: 0.05,
-  offset_secs: 0,
-  duration_secs: 60 * 60,  // sipped over 1 hour
-  stomach_state: "some_food",
+const profile = {
+  weight_kg: 75,
+  biological_sex: "male",
+  height_cm: 178,
+  age: 32,
 };
-const curve = generateCurve([drink], profile, "watson",
-  0, 4 * 3600, 60, 0.06, 0.09);`}
+
+const drinks = [
+  { volume_ml: 330, abv: 0.05, offset_secs: 0,    stomach_state: "some_food" },
+  { volume_ml: 330, abv: 0.05, offset_secs: 1800, stomach_state: "some_food" },
+  { volume_ml: 150, abv: 0.12, offset_secs: 3600, stomach_state: "some_food" },
+  { volume_ml: 150, abv: 0.12, offset_secs: 5400, stomach_state: "some_food" },
+];
+
+const widmark = generateCurve(
+  drinks, profile, "widmark",
+  0, 6 * 3600, 60, 0.06, 0.09
+);
+const watson = generateCurve(
+  drinks, profile, "watson",
+  0, 6 * 3600, 60, 0.06, 0.09
+);`}
           />
+
+          <DurationCard />
 
           <FeatureCard
             title="Session detection"
-            description="If the BAC from an earlier drinking bout has fully metabolised before your next drink, the crate calls that a new session and restarts the clock. No ghost alcohol carried over from brunch. Query the current BAC and you only see the session you&rsquo;re actually in."
+            description="If the BAC from an earlier drinking bout has fully metabolised before your next drink, the crate calls that a new session and restarts the clock. No ghost alcohol carried over from brunch. Query the current BAC and you only see the session you're actually in."
             viz={<SessionDetectionViz />}
-            code={`// Each session is evaluated independently — generate_curve
-// drops "past" sessions from its active slice, so we call it
-// once per session window and stitch the points together.
-const s1 = generateCurve(session1, profile, "watson",
-  0,        7 * 3600, 120, 0.06, 0.09);
-const s2 = generateCurve(session2, profile, "watson",
-  7 * 3600, 13 * 3600, 120, 0.06, 0.09);`}
+            code={`import { generateCurve } from "ethanol-rs";
+
+const profile = {
+  weight_kg: 75,
+  biological_sex: "male",
+  height_cm: 178,
+  age: 32,
+};
+
+const session1 = [
+  { volume_ml: 330, abv: 0.05, offset_secs: 0,    stomach_state: "some_food" },
+  { volume_ml: 330, abv: 0.05, offset_secs: 1800, stomach_state: "some_food" },
+];
+
+const session2 = [
+  { volume_ml: 330, abv: 0.05, offset_secs: 32400, stomach_state: "some_food" },
+  { volume_ml: 150, abv: 0.12, offset_secs: 36000, stomach_state: "some_food" },
+  { volume_ml: 330, abv: 0.05, offset_secs: 37800, stomach_state: "some_food" },
+];
+
+// Each session is evaluated independently — generateCurve drops
+// past sessions, so call once per window and stitch together.
+const s1 = generateCurve(
+  session1, profile, "watson",
+  0, 7 * 3600, 120, 0.06, 0.09
+);
+const s2 = generateCurve(
+  session2, profile, "watson",
+  7 * 3600, 13 * 3600, 120, 0.06, 0.09
+);`}
           />
 
           <FeatureCard
             title="Body weight sensitivity"
-            description="The same three drinks, served to a 55, 75 and 95 kg drinker. Less body water means a bigger dose per kilo, so the lightest curve peaks around 1.7× as high as the heaviest one. Physics doesn&rsquo;t play favourites."
+            description="The same three drinks, served to a 55, 75 and 95 kg drinker. Less body water means a bigger dose per kilo, so the lightest curve peaks around 1.7× as high as the heaviest one. Physics doesn't play favourites."
             viz={<WeightSensitivityViz />}
-            code={`const weights = [55, 75, 95];
+            code={`import { generateCurve } from "ethanol-rs";
+
+const drinks = [
+  { volume_ml: 330, abv: 0.05, offset_secs: 0,    stomach_state: "some_food" },
+  { volume_ml: 330, abv: 0.05, offset_secs: 1800, stomach_state: "some_food" },
+  { volume_ml: 150, abv: 0.12, offset_secs: 3600, stomach_state: "some_food" },
+];
+
+const weights = [55, 75, 95];
+
 const curves = weights.map((w) =>
-  generateCurve(drinks, { ...profile, weight_kg: w },
-    "watson", 0, 6 * 3600, 60, 0.06, 0.09)
+  generateCurve(
+    drinks,
+    { weight_kg: w, biological_sex: "male", height_cm: 178, age: 32 },
+    "watson",
+    0, 6 * 3600, 60, 0.06, 0.09
+  )
 );`}
           />
 
           <FeatureCard
             title="Biological sex"
-            description="Watson gives women a lower total body water fraction for the same weight, so the same dose of ethanol concentrates more. At identical weight, height and age a woman&rsquo;s BAC peaks noticeably higher than a man&rsquo;s."
+            description="Watson gives women a lower total body water fraction for the same weight, so the same dose of ethanol concentrates more. At identical weight, height and age a woman's BAC peaks noticeably higher than a man's."
             viz={<SexCompareViz />}
-            code={`const male   = { ...profile, biological_sex: "male" };
-const female = { ...profile, biological_sex: "female" };
-const m = generateCurve(drinks, male,   "watson", /* ... */);
-const f = generateCurve(drinks, female, "watson", /* ... */);`}
+            code={`import { generateCurve } from "ethanol-rs";
+
+const drinks = [
+  { volume_ml: 330, abv: 0.05, offset_secs: 0,    stomach_state: "some_food" },
+  { volume_ml: 150, abv: 0.12, offset_secs: 2700, stomach_state: "some_food" },
+  { volume_ml: 150, abv: 0.12, offset_secs: 5400, stomach_state: "some_food" },
+];
+
+const male   = { weight_kg: 75, biological_sex: "male",   height_cm: 178, age: 32 };
+const female = { weight_kg: 75, biological_sex: "female", height_cm: 178, age: 32 };
+
+const mCurve = generateCurve(
+  drinks, male, "watson",
+  0, 6 * 3600, 60, 0.06, 0.09
+);
+const fCurve = generateCurve(
+  drinks, female, "watson",
+  0, 6 * 3600, 60, 0.06, 0.09
+);`}
           />
 
           <FeatureCard
             title="Stomach state"
             description="Food slows gastric emptying, and with it absorption. The crate buckets this into three states (empty, some_food, full). More food in the stomach, lower and later peak. Mum was right about eating before going out."
             viz={<StomachStateViz />}
-            code={`const states = ["empty", "some_food", "full"] as const;
-for (const s of states) {
-  const drink = { ...base, stomach_state: s };
-  generateCurve([drink], profile, "watson",
-    0, 4 * 3600, 60, 0.06, 0.09);
-}`}
+            code={`import { generateCurve } from "ethanol-rs";
+
+const profile = {
+  weight_kg: 75,
+  biological_sex: "male",
+  height_cm: 178,
+  age: 32,
+};
+
+const states = ["empty", "some_food", "full"] as const;
+
+const curves = states.map((stomach_state) =>
+  generateCurve(
+    [{ volume_ml: 500, abv: 0.06, offset_secs: 0, stomach_state }],
+    profile,
+    "watson",
+    0, 4 * 3600, 60, 0.06, 0.09
+  )
+);`}
           />
 
-          <FeatureCard
-            title="Time to sober"
-            description="Given your current drinks, the crate finds the minute at which BAC returns to zero. It accounts for drinks still being absorbed, so it&rsquo;s more honest than just current BAC divided by the metabolism rate."
-            viz={<TimeToSoberViz />}
-            code={`const bac   = calculateBAC(drinks, profile, "watson");
-const mins  = minutesUntilSober(drinks, profile, "watson");`}
-          />
+          <TimeToSoberCard />
         </div>
       </section>
 

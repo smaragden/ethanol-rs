@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useWasm, withPace, type RustDrink, type RustProfile } from "./use-wasm";
 
 const PROFILE: RustProfile = {
@@ -18,19 +18,24 @@ function formatDuration(mins: number): string {
   return `${h}h ${m}m`;
 }
 
-export function TimeToSoberViz() {
+interface TimeToSoberVizProps {
+  numBeers: number;
+  onNumBeersChange: (value: number) => void;
+}
+
+export function TimeToSoberViz({
+  numBeers,
+  onNumBeersChange,
+}: TimeToSoberVizProps) {
   const mod = useWasm();
-  const [n, setN] = useState(3);
 
   const result = useMemo(() => {
     if (!mod) return { bac: 0, sober: 0 };
-    // Space n beers 30 min apart, most recent one finished 30 min ago so
-    // absorption has had time to show up in BAC.
     const drinks: RustDrink[] = withPace(
-      Array.from({ length: n }, (_, i) => ({
+      Array.from({ length: numBeers }, (_, i) => ({
         volume_ml: 330,
         abv: 0.05,
-        offset_secs: -(n - i) * 1800,
+        offset_secs: -(numBeers - i) * 1800,
         duration_secs: 0,
         stomach_state: "some_food",
       })),
@@ -38,7 +43,7 @@ export function TimeToSoberViz() {
     const bac = mod.calculateBAC(drinks, PROFILE, "watson") as number;
     const sober = mod.minutesUntilSober(drinks, PROFILE, "watson") as number;
     return { bac, sober };
-  }, [mod, n]);
+  }, [mod, numBeers]);
 
   return (
     <div className="flex flex-col items-center gap-5 py-4">
@@ -69,12 +74,12 @@ export function TimeToSoberViz() {
           min={0}
           max={8}
           step={1}
-          value={n}
-          onChange={(e) => setN(Number(e.target.value))}
+          value={numBeers}
+          onChange={(e) => onNumBeersChange(Number(e.target.value))}
           className="w-48 accent-primary"
         />
         <span className="font-display tabular-nums text-sm text-on-surface">
-          {n}
+          {numBeers}
         </span>
       </div>
     </div>

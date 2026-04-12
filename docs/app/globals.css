@@ -64,3 +64,16 @@ code, pre {
 pre {
   overflow-x: auto;
 }
+
+.highlighted-line {
+  background: linear-gradient(90deg, rgba(105, 246, 184, 0.08) 0%, transparent 80%);
+}
+
+.dynamic-value {
+  color: var(--primary);
+  font-weight: 600;
+  text-shadow: 0 0 12px rgba(105, 246, 184, 0.4);
+  box-decoration-break: clone;
+  border-bottom: 1.5px solid rgba(105, 246, 184, 0.4);
+  transition: color 0.5s, text-shadow 0.5s;
+}
