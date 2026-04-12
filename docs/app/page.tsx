@@ -159,15 +159,40 @@ const mins  = minutesUntilSober(drinks, profile, "watson");`}
         </div>
       </section>
 
+      {/* Disclaimer */}
+      <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-low/30 px-6 py-5 text-sm leading-relaxed text-on-surface-variant/70">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant/50">
+          Disclaimer
+        </h2>
+        <p className="font-medium text-on-surface-variant/90">
+          For educational and research purposes only.
+        </p>
+        <p className="mt-2">
+          This library provides <em>estimates</em> based on
+          population-average pharmacokinetic models. Individual responses to
+          alcohol vary significantly due to genetic polymorphisms in ADH/ALDH,
+          liver health, chronic tolerance, medication interactions, and
+          hydration status.
+        </p>
+        <p className="mt-2">
+          <strong className="text-on-surface-variant/90">
+            Do not use
+          </strong>{" "}
+          to determine fitness to drive, operate machinery, or make any
+          safety-critical decision. BAC estimates are not a substitute for
+          breathalyser or blood testing, clinical judgement, or following local
+          laws regarding alcohol consumption.
+        </p>
+        <p className="mt-2 font-medium text-on-surface-variant/90">
+          When in doubt, don&rsquo;t drive.
+        </p>
+      </section>
+
       {/* Footer */}
       <footer className="flex flex-col items-center gap-2 border-t border-outline-variant/10 pt-10 text-xs text-on-surface-variant/50">
         <p>
           ethanol-rs is a Rust library, dual-licensed MIT / Apache-2.0. The
           same crate powers the iOS, Android and web builds.
-        </p>
-        <p>
-          Numbers on this page are for playing around, not for medical or
-          legal advice.
         </p>
       </footer>
     </main>
