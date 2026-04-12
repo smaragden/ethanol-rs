@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/spacegrotesk/v16/V8mDoQDjQSkFtoMM3T6r8E7mPbF4Cw.woff2")
+    format("woff2");
+}
+
+:root {
+  --surface-lowest: #000000;
+  --surface: #0e0e0e;
+  --surface-container-low: #1a1a1a;
+  --surface-container: #1e1e1e;
+  --surface-container-high: #222222;
+  --surface-container-highest: #262626;
+  --surface-bright: #2c2c2c;
+  --surface-variant: #333333;
+
+  --primary: #69f6b8;
+  --primary-container: #06b77f;
+  --secondary: #f8a010;
+  --tertiary: #ff716a;
+  --on-primary-container: #003822;
+  --on-surface: #e6e1e5;
+  --on-surface-variant: #adaaaa;
+  --outline-variant: #49454f;
+}
+
+@theme inline {
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface: var(--surface);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-variant: var(--surface-variant);
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline-variant: var(--outline-variant);
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", var(--font-geist-sans), sans-serif;
+}
+
+body {
+  overflow-x: clip;
+  background: var(--surface-lowest);
+  color: var(--on-surface-variant);
+  font-family: var(--font-body);
+}
+
+code, pre {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+pre {
+  overflow-x: auto;
+}
