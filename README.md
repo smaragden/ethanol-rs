@@ -4,6 +4,22 @@ Cross-platform Rust library for ethanol pharmacokinetics modeling. Implements pe
 
 ---
 
+> **NOT CLINICALLY VALIDATED**
+>
+> The core BAC formulas (Widmark, Watson) and zero-order elimination are
+> peer-reviewed and widely used in forensic toxicology. However, some
+> features — notably **duration-aware sipping** (`duration_secs`) — are
+> simplified heuristics without published validation. Even the established
+> models carry ±20–30% inter-individual variation, and this implementation
+> has **not** been clinically or forensically validated against measured BAC.
+>
+> **Do not rely on this library to decide whether it is safe to drive, to
+> operate machinery, to take medication, or for any medical, legal, or
+> safety-critical purpose.** It is intended for research, education, and
+> rough personal awareness only. Use at your own risk.
+
+---
+
 ## Features
 
 - **Widmark Formula** — Weight-based BAC estimation with sex-specific distribution constants

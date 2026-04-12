@@ -2,6 +2,13 @@
 
 This is the WebAssembly build of ethanol-rs, a cross-platform library for ethanol pharmacokinetics modeling.
 
+> **NOT CLINICALLY VALIDATED.** Core BAC formulas (Widmark, Watson) are
+> peer-reviewed, but some features (e.g. duration-aware sipping) are
+> simplified heuristics. This implementation has **not** been validated
+> against measured BAC. **Do not rely on it to decide whether it is safe to
+> drive, operate machinery, take medication, or for any medical, legal, or
+> safety-critical purpose.** Use at your own risk.
+
 ## Building for WASM
 
 ### Prerequisites
