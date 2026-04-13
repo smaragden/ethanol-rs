@@ -98,6 +98,14 @@ function splitSessions(
 
   for (let i = 1; i < sorted.length; i++) {
     const currentSession = sessions[sessions.length - 1];
+    // Skip boundary check when drinks are at the same time — absorption
+    // hasn't started yet so BAC would be near-zero, falsely splitting them.
+    const gapMinutes = sorted[i].loggedAtMinute - sorted[i - 1].loggedAtMinute;
+    if (gapMinutes < 1) {
+      currentSession.push(sorted[i]);
+      continue;
+    }
+
     // Check if BAC from the current session's drinks is still > 0
     // at the time of the next drink
     const bacAtNext = tsBac.calculateBAC(

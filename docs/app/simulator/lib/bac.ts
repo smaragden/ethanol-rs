@@ -40,6 +40,11 @@ export function findSessionStart(
   let sessionStart = 0;
   for (let i = 1; i < sorted.length; i++) {
     const checkTime = sorted[i].loggedAtMinute;
+    // Skip boundary check when drinks are at the same time — absorption
+    // hasn't started yet so BAC would be near-zero, falsely splitting them.
+    const gapMinutes = checkTime - sorted[i - 1].loggedAtMinute;
+    if (gapMinutes < 1) continue;
+
     let rawBAC = 0;
     for (let j = sessionStart; j < i; j++) {
       rawBAC += drinkRawBAC(sorted[j], checkTime, tbw, stomachKa);
