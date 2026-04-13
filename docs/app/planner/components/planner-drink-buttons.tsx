@@ -1,6 +1,7 @@
 "use client";
 
-import type { SimAction, SimDrink } from "../lib/types";
+import type { SimDrink } from "@/app/simulator/lib/types";
+import type { PlannerAction } from "../hooks/use-planner";
 
 const PRESETS: Pick<SimDrink, "name" | "volumeMl" | "abv">[] = [
   { name: "Beer", volumeMl: 400, abv: 0.05 },
@@ -16,17 +17,20 @@ const EMOJI: Record<string, string> = {
   Cocktail: "\uD83C\uDF78",
 };
 
-interface DrinkButtonsProps {
-  dispatch: React.Dispatch<SimAction>;
+interface PlannerDrinkButtonsProps {
+  dispatch: React.Dispatch<PlannerAction>;
+  nextMinute: number;
 }
 
-export function DrinkButtons({ dispatch }: DrinkButtonsProps) {
+export function PlannerDrinkButtons({ dispatch, nextMinute }: PlannerDrinkButtonsProps) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3">
       {PRESETS.map((drink) => (
         <button
           key={drink.name}
-          onClick={() => dispatch({ type: "ADD_DRINK", drink })}
+          onClick={() =>
+            dispatch({ type: "ADD_DRINK", drink, atMinute: nextMinute })
+          }
           className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-highest/40 px-3 text-sm font-medium text-on-surface-variant backdrop-blur-xl transition-all hover:bg-surface-bright/60 active:scale-95 sm:px-5"
         >
           <span>{EMOJI[drink.name]}</span>

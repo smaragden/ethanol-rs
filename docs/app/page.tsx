@@ -1,4 +1,5 @@
 import { Simulator } from "./simulator/components/simulator";
+import { Planner } from "./planner/components/planner";
 import { FeatureCard } from "./_viz/feature-card";
 import { FormulaCompareViz } from "./_viz/formula-compare";
 import { DurationCard } from "./_viz/duration-card";
@@ -41,7 +42,13 @@ export default function Home() {
             href="#simulator"
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary/15 px-4 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
           >
-            Skip ahead to the sandbox
+            Live simulator
+          </a>
+          <a
+            href="#planner"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant/20 bg-surface-container-highest/40 px-4 text-sm font-medium text-on-surface transition-colors hover:bg-surface-bright/60"
+          >
+            Plan your evening
           </a>
         </div>
       </header>
@@ -205,7 +212,7 @@ const curves = states.map((stomach_state) =>
         </div>
       </section>
 
-      {/* Live simulator — the capstone, after you've seen each piece */}
+      {/* Live simulator */}
       <section id="simulator" className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="font-display text-2xl font-semibold text-on-surface sm:text-3xl">
@@ -220,6 +227,22 @@ const curves = states.map((stomach_state) =>
         </div>
         <div className="rounded-3xl border border-outline-variant/10 bg-surface-container-low/40 p-5 backdrop-blur-xl sm:p-8">
           <Simulator />
+        </div>
+      </section>
+
+      {/* Drink planner */}
+      <section id="planner" className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-display text-2xl font-semibold text-on-surface sm:text-3xl">
+            Plan your evening
+          </h2>
+          <p className="text-sm text-on-surface-variant/70">
+            Drop drinks onto the timeline, drag to adjust timing, and see the
+            full projected BAC curve before your first sip.
+          </p>
+        </div>
+        <div className="rounded-3xl border border-outline-variant/10 bg-surface-container-low/40 p-5 backdrop-blur-xl sm:p-8">
+          <Planner />
         </div>
       </section>
 
