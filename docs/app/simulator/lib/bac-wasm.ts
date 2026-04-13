@@ -43,15 +43,16 @@ function toRustDrinks(
 ) {
   // Sort by log time so we can cap each drink's duration at the gap
   // to the next drink — no drink overlaps its successor.
+  // When drinks share the same timestamp, keep the full computed duration
+  // (parallel sipping) so the absorption model doesn't degenerate.
   const sorted = [...drinks].sort(
     (a, b) => a.loggedAtMinute - b.loggedAtMinute,
   );
   return sorted.map((d, i) => {
     const computed = drinkingTimeSecs(d.volumeMl, d.abv, drinkPace);
     const next = sorted[i + 1];
-    const durationSecs = next
-      ? Math.min(computed, (next.loggedAtMinute - d.loggedAtMinute) * 60)
-      : computed;
+    const gapSecs = next ? (next.loggedAtMinute - d.loggedAtMinute) * 60 : Infinity;
+    const durationSecs = gapSecs > 0 ? Math.min(computed, gapSecs) : computed;
     return {
       volume_ml: d.volumeMl,
       abv: d.abv,

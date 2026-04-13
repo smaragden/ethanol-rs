@@ -196,6 +196,21 @@ fn find_session_start(
 
     let mut session_start = 0;
     for i in 1..sorted.len() {
+        // Skip the boundary check when absorption hasn't had time to register:
+        // - drinks at nearly the same time (< 60 s gap) always produce ~0 BAC
+        // - drinks still being sipped have barely-started absorption
+        let gap_secs = sorted[i].offset_secs - sorted[i - 1].offset_secs;
+        if gap_secs < 60.0 {
+            continue;
+        }
+        let any_still_sipping = sorted[session_start..i].iter().any(|d| {
+            d.duration_secs > 0.0
+                && sorted[i].offset_secs < d.offset_secs + d.duration_secs
+        });
+        if any_still_sipping {
+            continue;
+        }
+
         let bac_at_new_drink = bac_from_sorted(
             &sorted[session_start..i],
             profile,
@@ -884,6 +899,59 @@ mod tests {
         let bac = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
         // Should have some positive BAC from the recent beer
         assert!(bac >= 0.0);
+    }
+
+    #[test]
+    fn session_detection_simultaneous_sipped_drinks() {
+        // Regression: 3 sipped beers logged within 1–2 seconds of each other
+        // must stay in the same session. Before the fix, the sip-duration model
+        // returned near-zero absorbed_fraction at t≈1s, causing find_session_start
+        // to drop all but the last drink.
+        let drinks = vec![
+            sipped_beer(-1800.0, 840.0),  // 30 min ago, 14-min sip
+            sipped_beer(-1799.0, 840.0),  // ~1 s later
+            sipped_beer(-1798.0, 840.0),  // ~2 s later
+        ];
+        let bac_all = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
+        let bac_one = calculate_bac(&[sipped_beer(-1798.0, 840.0)], &male_80kg(), BACFormula::Widmark);
+        assert!(
+            bac_all > bac_one * 2.0,
+            "3 simultaneous sipped beers should produce much more BAC than 1: all={bac_all}, one={bac_one}"
+        );
+    }
+
+    #[test]
+    fn session_detection_same_offset_impulse_drinks() {
+        // Regression: impulse drinks (duration=0) at the exact same offset
+        // must stay in the same session. Before the fix, elapsed=0 produced
+        // absorbed_fraction=0, causing session reset.
+        let drinks = vec![
+            beer(-1800.0),
+            beer(-1800.0),
+            beer(-1800.0),
+        ];
+        let bac_all = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
+        let bac_one = calculate_bac(&[beer(-1800.0)], &male_80kg(), BACFormula::Widmark);
+        assert!(
+            bac_all > bac_one * 2.0,
+            "3 beers at same offset should accumulate: all={bac_all}, one={bac_one}"
+        );
+    }
+
+    #[test]
+    fn session_detection_sipped_then_gap_still_splits() {
+        // A sipped beer 8 hours ago (fully metabolized) should still be detected
+        // as a separate session from a beer now.
+        let drinks = vec![
+            sipped_beer(-28800.0, 840.0),  // 8 hours ago
+            sipped_beer(0.0, 840.0),        // just now
+        ];
+        let bac_with_old = calculate_bac(&drinks, &male_80kg(), BACFormula::Widmark);
+        let bac_just_new = calculate_bac(&[sipped_beer(0.0, 840.0)], &male_80kg(), BACFormula::Widmark);
+        assert!(
+            (bac_with_old - bac_just_new).abs() < 0.001,
+            "Old sipped drink should not affect current BAC: with_old={bac_with_old}, just_new={bac_just_new}"
+        );
     }
 
     #[test]
